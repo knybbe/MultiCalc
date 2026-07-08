@@ -16,9 +16,9 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		global.json = global.json
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MultiCalc.Core", "..\MultiCalc.Core\MultiCalc.Core.csproj", "{1DBFD433-41AB-4D79-99A5-38980FA6C594}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MultiCalc.Core", "MultiCalc.Core\MultiCalc.Core.csproj", "{1DBFD433-41AB-4D79-99A5-38980FA6C594}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MultiCalc.Tests", "..\MultiCalc.Tests\MultiCalc.Tests.csproj", "{7EF3555F-B125-4582-805D-C92D4A2820F2}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MultiCalc.Tests", "MultiCalc.Tests\MultiCalc.Tests.csproj", "{7EF3555F-B125-4582-805D-C92D4A2820F2}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
