@@ -39,11 +39,14 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - name: Install WASM workload
-        run: dotnet workload install wasm-tools
+      - name: Install workloads for full restore
+        run: |
+          dotnet workload install wasm-tools
+          dotnet workload install android
+          dotnet workload install ios
 
       - name: Restore
-        run: dotnet restore MultiCalc/MultiCalc.csproj -p:TargetFrameworks=net10.0-browserwasm
+        run: dotnet restore MultiCalc/MultiCalc.csproj
 
       - name: Publish WASM
         run: dotnet publish MultiCalc/MultiCalc.csproj -c Release -f net10.0-browserwasm -o artifacts/wasm
@@ -64,8 +67,14 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      - name: Install workloads for full restore
+        run: |
+          dotnet workload install wasm-tools
+          dotnet workload install android
+          dotnet workload install ios
+
       - name: Restore
-        run: dotnet restore MultiCalc/MultiCalc.csproj -p:TargetFrameworks=net10.0-desktop
+        run: dotnet restore MultiCalc/MultiCalc.csproj
 
       - name: Publish Linux Desktop
         run: dotnet publish MultiCalc/MultiCalc.csproj -c Release -f net10.0-desktop -o artifacts/linux-desktop
@@ -86,8 +95,14 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      - name: Install workloads for full restore
+        run: |
+          dotnet workload install wasm-tools
+          dotnet workload install android
+          dotnet workload install ios
+
       - name: Restore
-        run: dotnet restore MultiCalc/MultiCalc.csproj -p:TargetFrameworks=net10.0-desktop
+        run: dotnet restore MultiCalc/MultiCalc.csproj
 
       - name: Publish Windows
         run: dotnet publish MultiCalc/MultiCalc.csproj -c Release -f net10.0-desktop -o artifacts/windows
@@ -108,11 +123,14 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - name: Install Android workload
-        run: dotnet workload install android
+      - name: Install workloads for full restore
+        run: |
+          dotnet workload install wasm-tools
+          dotnet workload install android
+          dotnet workload install ios
 
       - name: Restore
-        run: dotnet restore MultiCalc/MultiCalc.csproj -p:TargetFrameworks=net10.0-android
+        run: dotnet restore MultiCalc/MultiCalc.csproj
 
       - name: Publish Android
         run: dotnet publish MultiCalc/MultiCalc.csproj -c Release -f net10.0-android -o artifacts/android
@@ -133,13 +151,15 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - name: Install required workloads (iOS / mac)
+      - name: Install workloads for full restore
         run: |
+          dotnet workload install wasm-tools
+          dotnet workload install android
           dotnet workload install ios
           # macOS desktop usually available; iOS for simulator/archive
 
       - name: Restore
-        run: dotnet restore MultiCalc/MultiCalc.csproj -p:TargetFrameworks=net10.0-desktop;net10.0-ios
+        run: dotnet restore MultiCalc/MultiCalc.csproj
 
       - name: Publish macOS Desktop
         run: dotnet publish MultiCalc/MultiCalc.csproj -c Release -f net10.0-desktop -o artifacts/macos
