@@ -11,7 +11,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
@@ -28,25 +28,22 @@ jobs:
     runs-on: ubuntu-latest
     needs: test
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version: '22'
 
       - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.x'
 
-      - name: Install workloads for full restore
-        run: |
-          dotnet workload install wasm-tools
-          dotnet workload install android
-          dotnet workload install ios
+      - name: Install WASM workload
+        run: dotnet workload install wasm-tools
 
-      - name: Restore
-        run: dotnet restore MultiCalc/MultiCalc.csproj
+      - name: Restore Core
+        run: dotnet restore MultiCalc.Core/MultiCalc.Core.csproj
 
       - name: Publish WASM
         run: dotnet publish MultiCalc/MultiCalc.csproj -c Release -f net10.0-browserwasm -o artifacts/wasm
@@ -62,19 +59,13 @@ jobs:
     runs-on: ubuntu-latest
     needs: test
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.x'
 
-      - name: Install workloads for full restore
-        run: |
-          dotnet workload install wasm-tools
-          dotnet workload install android
-          dotnet workload install ios
-
-      - name: Restore
-        run: dotnet restore MultiCalc/MultiCalc.csproj
+      - name: Restore Core
+        run: dotnet restore MultiCalc.Core/MultiCalc.Core.csproj
 
       - name: Publish Linux Desktop
         run: dotnet publish MultiCalc/MultiCalc.csproj -c Release -f net10.0-desktop -o artifacts/linux-desktop
@@ -90,19 +81,13 @@ jobs:
     runs-on: windows-latest
     needs: test
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.x'
 
-      - name: Install workloads for full restore
-        run: |
-          dotnet workload install wasm-tools
-          dotnet workload install android
-          dotnet workload install ios
-
-      - name: Restore
-        run: dotnet restore MultiCalc/MultiCalc.csproj
+      - name: Restore Core
+        run: dotnet restore MultiCalc.Core/MultiCalc.Core.csproj
 
       - name: Publish Windows
         run: dotnet publish MultiCalc/MultiCalc.csproj -c Release -f net10.0-desktop -o artifacts/windows
@@ -118,19 +103,16 @@ jobs:
     runs-on: ubuntu-latest
     needs: test
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.x'
 
-      - name: Install workloads for full restore
-        run: |
-          dotnet workload install wasm-tools
-          dotnet workload install android
-          dotnet workload install ios
+      - name: Install Android workload
+        run: dotnet workload install android
 
-      - name: Restore
-        run: dotnet restore MultiCalc/MultiCalc.csproj
+      - name: Restore Core
+        run: dotnet restore MultiCalc.Core/MultiCalc.Core.csproj
 
       - name: Publish Android
         run: dotnet publish MultiCalc/MultiCalc.csproj -c Release -f net10.0-android -o artifacts/android
@@ -146,20 +128,17 @@ jobs:
     runs-on: macos-latest
     needs: test
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.x'
 
-      - name: Install workloads for full restore
-        run: |
-          dotnet workload install wasm-tools
-          dotnet workload install android
-          dotnet workload install ios
-          # macOS desktop usually available; iOS for simulator/archive
+      - name: Install iOS workload
+        run: dotnet workload install ios
+        # macOS desktop usually available; iOS for simulator/archive
 
-      - name: Restore
-        run: dotnet restore MultiCalc/MultiCalc.csproj
+      - name: Restore Core
+        run: dotnet restore MultiCalc.Core/MultiCalc.Core.csproj
 
       - name: Publish macOS Desktop
         run: dotnet publish MultiCalc/MultiCalc.csproj -c Release -f net10.0-desktop -o artifacts/macos
