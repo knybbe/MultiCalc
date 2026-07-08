@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Uno.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -6,4 +6,9 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <Target Name="ForceStandardTFM" BeforeTargets="ProcessFrameworkReferences;GetTargetFrameworks">
+    <PropertyGroup>
+      <TargetFramework>net10.0</TargetFramework>
+    </PropertyGroup>
+  </Target>
 </Project>
