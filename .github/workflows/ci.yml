@@ -22,10 +22,12 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Restore
-        run: dotnet restore MultiCalc.Tests/MultiCalc.Tests.csproj
+        working-directory: MultiCalc.Tests
+        run: dotnet msbuild MultiCalc.Tests.csproj /t:Restore /p:TargetFramework=net10.0
 
       - name: Test
-        run: dotnet test MultiCalc.Tests/MultiCalc.Tests.csproj --no-restore --verbosity normal --logger "console;verbosity=detailed"
+        working-directory: MultiCalc.Tests
+        run: dotnet test MultiCalc.Tests.csproj --no-restore --verbosity normal --logger "console;verbosity=detailed"
 
   build-wasm:
     if: github.event_name == 'pull_request'
