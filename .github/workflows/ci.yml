@@ -50,7 +50,7 @@ jobs:
         run: dotnet restore MultiCalc/MultiCalc.csproj -p:TargetFrameworks=net10.0-browserwasm
 
       - name: Publish WASM
-        run: dotnet publish MultiCalc/MultiCalc.csproj -c Release -f net10.0-browserwasm -o artifacts/wasm
+        run: dotnet publish MultiCalc/MultiCalc.csproj -c Release -f net10.0-browserwasm -p:TargetFrameworks=net10.0-browserwasm -o artifacts/wasm
 
       - name: Upload WASM artifact
         uses: actions/upload-artifact@v4
@@ -75,7 +75,7 @@ jobs:
         run: dotnet restore MultiCalc/MultiCalc.csproj -p:TargetFrameworks=net10.0-desktop
 
       - name: Publish Linux Desktop
-        run: dotnet publish MultiCalc/MultiCalc.csproj -c Release -f net10.0-desktop -o artifacts/linux-desktop
+        run: dotnet publish MultiCalc/MultiCalc.csproj -c Release -f net10.0-desktop -p:TargetFrameworks=net10.0-desktop -o artifacts/linux-desktop
 
       - name: Upload Linux artifact
         uses: actions/upload-artifact@v4
@@ -100,7 +100,7 @@ jobs:
         run: dotnet restore MultiCalc/MultiCalc.csproj -p:TargetFrameworks=net10.0-desktop
 
       - name: Publish Windows
-        run: dotnet publish MultiCalc/MultiCalc.csproj -c Release -f net10.0-desktop -o artifacts/windows
+        run: dotnet publish MultiCalc/MultiCalc.csproj -c Release -f net10.0-desktop -p:TargetFrameworks=net10.0-desktop -o artifacts/windows
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
@@ -128,7 +128,7 @@ jobs:
         run: dotnet restore MultiCalc/MultiCalc.csproj -p:TargetFrameworks=net10.0-android
 
       - name: Publish Android
-        run: dotnet publish MultiCalc/MultiCalc.csproj -c Release -f net10.0-android -o artifacts/android
+        run: dotnet publish MultiCalc/MultiCalc.csproj -c Release -f net10.0-android -p:TargetFrameworks=net10.0-android -o artifacts/android
 
       - name: Upload Android artifact
         uses: actions/upload-artifact@v4
@@ -157,13 +157,13 @@ jobs:
         run: dotnet restore MultiCalc/MultiCalc.csproj -p:TargetFrameworks=net10.0-desktop
 
       - name: Publish macOS Desktop
-        run: dotnet publish MultiCalc/MultiCalc.csproj -c Release -f net10.0-desktop -o artifacts/macos
+        run: dotnet publish MultiCalc/MultiCalc.csproj -c Release -f net10.0-desktop -p:TargetFrameworks=net10.0-desktop -o artifacts/macos
 
       - name: Restore iOS
         run: dotnet restore MultiCalc/MultiCalc.csproj -p:TargetFrameworks=net10.0-ios
 
       - name: Publish iOS (unsigned for CI)
-        run: dotnet publish MultiCalc/MultiCalc.csproj -c Release -f net10.0-ios -o artifacts/ios || echo "iOS publish may require additional setup/signing; artifact may be partial"
+        run: dotnet publish MultiCalc/MultiCalc.csproj -c Release -f net10.0-ios -p:TargetFrameworks=net10.0-ios -o artifacts/ios || echo "iOS publish may require additional setup/signing; artifact may be partial"
 
       - name: Upload iOS/macOS artifacts
         uses: actions/upload-artifact@v4
