@@ -1,0 +1,149 @@
+name: MultiCalc CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Test
+        run: dotnet test --no-restore --verbosity normal --logger "console;verbosity=detailed"
+
+  build-wasm:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install WASM workload
+        run: dotnet workload install wasm-tools
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Publish WASM
+        run: dotnet publish MultiCalc/MultiCalc/MultiCalc.csproj -c Release -f net10.0-browserwasm -o artifacts/wasm
+
+      - name: Upload WASM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasm
+          path: artifacts/wasm
+          retention-days: 7
+
+  build-desktop-linux:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Publish Linux Desktop
+        run: dotnet publish MultiCalc/MultiCalc/MultiCalc.csproj -c Release -f net10.0-desktop -o artifacts/linux-desktop
+
+      - name: Upload Linux artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-desktop
+          path: artifacts/linux-desktop
+          retention-days: 7
+
+  build-windows:
+    runs-on: windows-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Publish Windows
+        run: dotnet publish MultiCalc/MultiCalc/MultiCalc.csproj -c Release -f net10.0-desktop -o artifacts/windows
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: artifacts/windows
+          retention-days: 7
+
+  build-android:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install Android workload
+        run: dotnet workload install android
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Publish Android
+        run: dotnet publish MultiCalc/MultiCalc/MultiCalc.csproj -c Release -f net10.0-android -o artifacts/android
+
+      - name: Upload Android artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: artifacts/android
+          retention-days: 7
+
+  build-ios-macos:
+    runs-on: macos-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install required workloads (iOS / mac)
+        run: |
+          dotnet workload install ios
+          # macOS desktop usually available; iOS for simulator/archive
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Publish macOS Desktop
+        run: dotnet publish MultiCalc/MultiCalc/MultiCalc.csproj -c Release -f net10.0-desktop -o artifacts/macos
+
+      - name: Publish iOS (unsigned for CI)
+        run: dotnet publish MultiCalc/MultiCalc/MultiCalc.csproj -c Release -f net10.0-ios -o artifacts/ios || echo "iOS publish may require additional setup/signing; artifact may be partial"
+
+      - name: Upload iOS/macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-macos
+          path: artifacts/
+          retention-days: 7
