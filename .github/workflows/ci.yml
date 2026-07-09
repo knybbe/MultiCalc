@@ -389,6 +389,20 @@ jobs:
       - name: Remove pre-compressed
         run: find site/pr -type f \( -name "*.br" -o -name "*.gz" \) -delete || true
 
+      - name: Debug - list files in PR subdir (to diagnose missing wasm)
+        run: |
+          PR_NUM="${{ github.event.pull_request.number }}"
+          echo "=== Top level under site/pr/$PR_NUM ==="
+          ls -1 site/pr/$PR_NUM/ 2>/dev/null || echo "no pr dir"
+          echo "=== _framework dir exists? ==="
+          ls -ld site/pr/$PR_NUM/_framework 2>/dev/null || echo "MISSING _framework dir"
+          echo "=== Number of files in _framework ==="
+          find site/pr/$PR_NUM/_framework -type f 2>/dev/null | wc -l || echo 0
+          echo "=== Sample .wasm files ==="
+          ls site/pr/$PR_NUM/_framework/*.wasm 2>/dev/null | head -5 || echo "NO .wasm files found"
+          echo "=== Sample package dir ==="
+          ls site/pr/$PR_NUM/package_* 2>/dev/null | head -1 || echo "NO package dir"
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
