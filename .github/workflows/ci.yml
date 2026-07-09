@@ -308,6 +308,9 @@ jobs:
             sed -i "s/ *integrity='[^']*'//gI" {} + || true
           find site -type f \( -name "*.html" -o -name "*.js" -o -name "*.json" -o -name "manifest.webmanifest" \) -exec \
             sed -i 's/"integrity":"[^"]*"//gI' {} + || true
+          # Clear hashes in boot json / manifest to disable SRI in JS loader (set to empty)
+          find site -type f \( -name "*.json" -o -name "manifest.webmanifest" \) -exec \
+            sed -i 's/"sha256-[^"]*"/""/g' {} + || true
           # Explicit on index if present
           [ -f site/index.html ] && sed -i 's/ *integrity="[^"]*"//gI' site/index.html || true
           [ -f site/index.html ] && sed -i "s/ *integrity='[^']*'//gI" site/index.html || true
@@ -402,6 +405,20 @@ jobs:
 
       - name: Remove pre-compressed
         run: find site/pr -type f \( -name "*.br" -o -name "*.gz" \) -delete || true
+
+      - name: Final integrity strip on app index.html (guarantee no SRI)
+        run: |
+          PR_NUM="${{ github.event.pull_request.number }}"
+          APP_INDEX="site/pr/$PR_NUM/index.html"
+          if [ -f "$APP_INDEX" ]; then
+            sed -i 's/ *integrity="[^"]*"//gI' "$APP_INDEX" || true
+            sed -i "s/ *integrity='[^']*'//gI" "$APP_INDEX" || true
+            sed -i 's/ *integrity=[^ >]*//gI' "$APP_INDEX" || true
+            echo "Stripped integrity from $APP_INDEX"
+          fi
+          # Clear sha hashes in json under subdir so JS loader skips integrity checks
+          find site/pr/$PR_NUM -type f \( -name "*.json" -o -name "manifest.webmanifest" \) -exec \
+            sed -i 's/"sha256-[^"]*"/""/g' {} + || true
 
       - name: Debug - list files in PR subdir (to diagnose missing wasm)
         run: |
