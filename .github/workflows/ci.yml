@@ -319,15 +319,9 @@ jobs:
         run: |
           PR_NUM="${{ github.event.pull_request.number }}"
           mkdir -p site/pr/$PR_NUM
-          # Move all current top-level content (files and dirs, including dotfiles) into the subdir
-          # This leaves site/ clean for the placeholder
-          shopt -s dotglob 2>/dev/null || true
-          for item in site/* site/.*; do
-            name=$(basename "$item")
-            if [ "$name" != "pr" ] && [ "$name" != "." ] && [ "$name" != ".." ]; then
-              mv "$item" site/pr/$PR_NUM/ 2>/dev/null || true
-            fi
-          done
+          # Move all current top-level items (files, dirs, dotfiles) into the subdir, excluding the pr dir itself
+          # This is more reliable than cp via /tmp for ensuring all _framework files are included
+          find site -mindepth 1 -maxdepth 1 ! -path 'site/pr' -exec mv {} site/pr/$PR_NUM/ \;
           # ensure .nojekyll (for Pages) and 404.html are present inside the subdir too
           touch site/.nojekyll
           cp site/.nojekyll site/pr/$PR_NUM/.nojekyll 2>/dev/null || true
@@ -341,6 +335,18 @@ jobs:
           sed -i 's/^          //' site/index.html
           sed -i "s|__PRNUM__|${PR_NUM}|g" site/index.html
           cp site/index.html site/404.html 2>/dev/null || true
+
+      - name: Verify restructure
+        run: |
+          PR_NUM="${{ github.event.pull_request.number }}"
+          echo "=== After restructure ==="
+          ls -ld site/pr/$PR_NUM 2>/dev/null || echo "No pr dir"
+          echo "=== _framework present? ==="
+          ls -ld site/pr/$PR_NUM/_framework 2>/dev/null || echo "MISSING _framework"
+          echo "=== Specific wasm file ==="
+          ls -l site/pr/$PR_NUM/_framework/System.Linq.6s0kut8m82.wasm 2>/dev/null || echo "MISSING System.Linq.6s0kut8m82.wasm"
+          echo "=== Number of .wasm ==="
+          find site/pr/$PR_NUM/_framework -name '*.wasm' 2>/dev/null | wc -l || echo 0
 
       - name: Add service worker stub
         run: |
