@@ -317,11 +317,12 @@ jobs:
           PR_NUM="${{ github.event.pull_request.number }}"
           mkdir -p /tmp/app
           shopt -s dotglob 2>/dev/null || true
-          mv site/* /tmp/app/ 2>/dev/null || true
-          mv site/.[!.]* /tmp/app/ 2>/dev/null || true
+          cp -a site/* /tmp/app/ 2>/dev/null || true
+          cp -a site/.[!.]* /tmp/app/ 2>/dev/null || true
           mkdir -p site/pr/$PR_NUM
-          mv /tmp/app/* site/pr/$PR_NUM/ 2>/dev/null || true
-          mv /tmp/app/.[!.]* site/pr/$PR_NUM/ 2>/dev/null || true
+          cp -a /tmp/app/* site/pr/$PR_NUM/ 2>/dev/null || true
+          cp -a /tmp/app/.[!.]* site/pr/$PR_NUM/ 2>/dev/null || true
+          rm -rf /tmp/app
           # ensure .nojekyll (for Pages) and 404.html are present inside the subdir too
           touch site/.nojekyll
           cp site/.nojekyll site/pr/$PR_NUM/.nojekyll 2>/dev/null || true
