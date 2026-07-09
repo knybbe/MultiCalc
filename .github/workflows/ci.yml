@@ -196,3 +196,90 @@ jobs:
           name: ios-macos
           path: artifacts/
           retention-days: 7
+
+  deploy-wasm:
+    # Only deploy on successful build-wasm for main pushes or manual dispatch
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
+    needs: build-wasm
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    concurrency:
+      group: "pages"
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      # Download the artifact produced by the needed build-wasm job
+      # (the job only runs after successful build-wasm on main or dispatch)
+      - name: Download WASM artifact from build-wasm
+        uses: actions/download-artifact@v4
+        with:
+          name: wasm
+          path: site
+
+      - name: Prepare GitHub Pages site (promote wwwroot + SPA fallback)
+        run: |
+          # Uno WASM publish puts the app (including index.html) under wwwroot/
+          # Copy its contents up so the app is served from the site root
+          if [ -d "site/wwwroot" ]; then
+            cp -r site/wwwroot/* site/ || true
+            rm -rf site/wwwroot || true
+          fi
+
+          cp site/index.html site/404.html || true
+          touch site/.nojekyll
+
+      - name: Add service worker stub (prevent 404 for PWA registration at wrong scope)
+        run: |
+          echo 'self.addEventListener("install", () => self.skipWaiting());' > site/service-worker.js || true
+
+      - name: Fix paths for /MultiCalc/ subfolder (normalize doubles first, then prefix)
+        run: |
+          # 1. Fix any double-prefix that was introduced by previous steps or BaseHref + sed combo
+          find site -type f \( -name "*.html" -o -name "*.js" -o -name "*.css" -o -name "*.json" -o -name "manifest.webmanifest" \) -exec \
+            sed -i 's|/MultiCalc/MultiCalc/|/MultiCalc/|g' {} + || true
+
+          # 2. Prefix root-absolute paths that do not already start with /MultiCalc
+          # This safely handles package_ hashes, css, js, manifest, favicon etc.
+          find site -type f \( -name "*.html" -o -name "*.js" -o -name "*.css" -o -name "*.json" -o -name "manifest.webmanifest" \) -exec \
+            sed -i \
+              -e 's|="\(/[^M][^"]*\)"|="/MultiCalc\1"|g' \
+              -e "s|='\(/[^M][^']*\)'|='/MultiCalc\1'|g" \
+              -e 's|"\(/package_[^"]*\)"|"/MultiCalc\1"|g' \
+              -e "s|'\(/package_[^']*\)'|'/MultiCalc\1'|g" \
+              -e 's|"/manifest.webmanifest"|"/MultiCalc/manifest.webmanifest"|g' \
+              -e 's|"/favicon.ico"|"/MultiCalc/favicon.ico"|g' \
+              -e 's|"/normalize.css"|"/MultiCalc/normalize.css"|g' \
+              -e 's|"/uno.css"|"/MultiCalc/uno.css"|g' \
+              -e 's|"/Fonts.css"|"/MultiCalc/Fonts.css"|g' \
+              -e 's|"/uno-bootstrap.js"|"/MultiCalc/uno-bootstrap.js"|g' \
+              -e 's|"/uno-bootstrap.css"|"/MultiCalc/uno-bootstrap.css"|g' \
+              {} + || true
+
+      - name: Remove pre-compressed assets so rewritten source files are served
+        run: |
+          # .br and .gz contain the old absolute paths. Remove them to force serving the fixed versions.
+          find site \( -name "*.br" -o -name "*.gz" \) -delete || true
+
+      - name: Ensure <base> tag for subfolder
+        run: |
+          # Help any relative loads and the app itself know the correct base.
+          if [ -f site/index.html ] && ! grep -q 'base href' site/index.html; then
+            sed -i 's|<head>|<head><base href="/MultiCalc/">|' site/index.html || true
+          fi
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
