@@ -17,8 +17,7 @@ A basic multiplatform calculator built with **Uno Platform**.
 - `MultiCalc/` — Main Uno Platform single-project app (XAML UI + integration)
 - `MultiCalc.Core/` — Pure .NET class library containing `CalculatorEngine` (no UI)
 - `MultiCalc.Tests/` — xUnit tests for the engine (run on any .NET)
-- `.github/workflows/ci.yml` — GitHub Actions for tests + cross-platform builds
-- `.github/workflows/deploy-wasm.yml` — Deploys the WebAssembly build to GitHub Pages on main pushes
+- `.github/workflows/ci.yml` — GitHub Actions for tests + cross-platform builds + WASM deploy to GitHub Pages (main + PR previews under /pr/N/)
 
 ## Getting Started (local)
 
