@@ -313,7 +313,7 @@ jobs:
         with:
           script: |
             const prNumber = context.payload.pull_request.number;
-            const previewUrl = `https://knybbe.github.io/MultiCalc/`;
+            const previewUrl = `https://knybbe.github.io/MultiCalc/prerelease/${prNumber}/`;
             github.rest.issues.createComment({
               issue_number: prNumber,
               owner: context.repo.owner,
