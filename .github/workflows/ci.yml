@@ -206,13 +206,8 @@ jobs:
           path: artifacts/
           retention-days: 7
 
-  deploy-wasm:
-    # Run on PRs (for preview verification) and on main pushes (production).
-    # Only if from the same repo (not forks) for PRs to have pages permissions.
-    if: >-
-      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) ||
-      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-      github.event_name == 'workflow_dispatch'
+  deploy-wasm-main:
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
     needs: build-wasm
     runs-on: ubuntu-latest
     permissions:
@@ -220,14 +215,12 @@ jobs:
       pages: write
       id-token: write
     concurrency:
-      group: "pages-${{ github.event_name == 'pull_request' && github.event.pull_request.number || 'main' }}"
-      cancel-in-progress: true
+      group: "pages-main"
+      cancel-in-progress: false
     environment:
-      name: ${{ github.event_name == 'pull_request' && 'prerelease' || 'github-pages' }}
-      url: https://knybbe.github.io/MultiCalc/${{ github.event_name == 'pull_request' && format('pr/{0}', github.event.pull_request.number) || '' }}
+      name: github-pages
+      url: https://knybbe.github.io/MultiCalc/
     steps:
-      # Download the artifact produced by the needed build-wasm job
-      # (the job only runs after successful build-wasm on main or dispatch)
       - name: Download WASM artifact from build-wasm
         uses: actions/download-artifact@v4
         with:
@@ -236,64 +229,26 @@ jobs:
 
       - name: Prepare GitHub Pages site (promote wwwroot + SPA fallback)
         run: |
-          # Uno WASM publish puts the app (including index.html) under wwwroot/
-          # Copy its contents up so the app is served from the site root
           if [ -d "site/wwwroot" ]; then
             cp -r site/wwwroot/* site/ || true
             rm -rf site/wwwroot || true
           fi
-
           cp site/index.html site/404.html || true
           touch site/.nojekyll
 
-      - name: Restructure for PR pr subpath (after prepare, for subdir deploy)
-        if: github.event_name == 'pull_request'
-        run: |
-          PR_NUM="${{ github.event.pull_request.number }}"
-          mkdir -p /tmp/app
-          mv site/* /tmp/app/ 2>/dev/null || true
-          mkdir -p site/pr/$PR_NUM
-          mv /tmp/app/* site/pr/$PR_NUM/ 2>/dev/null || true
-          echo "Restructured for pr/$PR_NUM"
+      - name: Add service worker stub
+        run: echo 'self.addEventListener("install", () => self.skipWaiting());' > site/service-worker.js || true
 
-      - name: Add service worker stub (prevent 404 for PWA registration at wrong scope)
+      - name: Fix paths for /MultiCalc/ (normalize)
         run: |
-          echo 'self.addEventListener("install", () => self.skipWaiting());' > site/service-worker.js || true
+          for f in $(find site -type f \( -name "*.html" -o -name "*.js" -o -name "*.css" -o -name "*.json" -o -name "manifest.webmanifest" \) 2>/dev/null); do
+            sed -i 's|/MultiCalc/MultiCalc/|/MultiCalc/|g' "$f" || true
+            sed -i 's|="\(/[^M][^"]*\)"|="/MultiCalc\1"|g' "$f" || true
+            sed -i "s|='\(/[^M][^']*\)'|='/MultiCalc\1'|g" "$f" || true
+          done || true
 
-      - name: Fix paths for /MultiCalc/ subfolder (normalize doubles first, then prefix)
-        run: |
-          # 1. Fix any double-prefix that was introduced by previous steps or BaseHref + sed combo
-          find site -type f \( -name "*.html" -o -name "*.js" -o -name "*.css" -o -name "*.json" -o -name "manifest.webmanifest" \) -exec \
-            sed -i 's|/MultiCalc/MultiCalc/|/MultiCalc/|g' {} + || true
-
-          # 2. Prefix root-absolute paths that do not already start with /MultiCalc
-          # This safely handles package_ hashes, css, js, manifest, favicon etc.
-          find site -type f \( -name "*.html" -o -name "*.js" -o -name "*.css" -o -name "*.json" -o -name "manifest.webmanifest" \) -exec \
-            sed -i \
-              -e 's|="\(/[^M][^"]*\)"|="/MultiCalc\1"|g' \
-              -e "s|='\(/[^M][^']*\)'|='/MultiCalc\1'|g" \
-              -e 's|"\(/package_[^"]*\)"|"/MultiCalc\1"|g' \
-              -e "s|'\(/package_[^']*\)'|'/MultiCalc\1'|g" \
-              -e 's|"/manifest.webmanifest"|"/MultiCalc/manifest.webmanifest"|g' \
-              -e 's|"/favicon.ico"|"/MultiCalc/favicon.ico"|g' \
-              -e 's|"/normalize.css"|"/MultiCalc/normalize.css"|g' \
-              -e 's|"/uno.css"|"/MultiCalc/uno.css"|g' \
-              -e 's|"/Fonts.css"|"/MultiCalc/Fonts.css"|g' \
-              -e 's|"/uno-bootstrap.js"|"/MultiCalc/uno-bootstrap.js"|g' \
-              -e 's|"/uno-bootstrap.css"|"/MultiCalc/uno-bootstrap.css"|g' \
-              {} + || true
-
-      - name: Remove pre-compressed assets so rewritten source files are served
-        run: |
-          # .br and .gz contain the old absolute paths. Remove them to force serving the fixed versions.
-          find site \( -name "*.br" -o -name "*.gz" \) -delete || true
-
-      - name: Ensure <base> tag for subfolder
-        run: |
-          # Help any relative loads and the app itself know the correct base.
-          if [ -f site/index.html ] && ! grep -q 'base href' site/index.html; then
-            sed -i 's|<head>|<head><base href="/MultiCalc/">|' site/index.html || true
-          fi
+      - name: Remove pre-compressed
+        run: find site \( -name "*.br" -o -name "*.gz" \) -delete || true
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
@@ -307,10 +262,102 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
 
+  deploy-wasm-pr:
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    needs: build-wasm
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+      pull-requests: write
+    concurrency:
+      group: "pages-pr-${{ github.event.pull_request.number }}"
+      cancel-in-progress: true
+    environment:
+      name: prerelease
+      url: https://knybbe.github.io/MultiCalc/pr/${{ github.event.pull_request.number }}/
+    steps:
+      - name: Download WASM artifact from build-wasm
+        uses: actions/download-artifact@v4
+        with:
+          name: wasm
+          path: site
+
+      - name: Prepare GitHub Pages site (promote wwwroot + SPA fallback)
+        run: |
+          if [ -d "site/wwwroot" ]; then
+            cp -r site/wwwroot/* site/ || true
+            rm -rf site/wwwroot || true
+          fi
+          cp site/index.html site/404.html || true
+          touch site/.nojekyll
+
+      - name: Restructure for pr/${{ github.event.pull_request.number }} subpath
+        run: |
+          PR_NUM="${{ github.event.pull_request.number }}"
+          mkdir -p /tmp/app
+          shopt -s dotglob 2>/dev/null || true
+          mv site/* /tmp/app/ 2>/dev/null || true
+          mv site/.[!.]* /tmp/app/ 2>/dev/null || true
+          mkdir -p site/pr/$PR_NUM
+          mv /tmp/app/* site/pr/$PR_NUM/ 2>/dev/null || true
+          mv /tmp/app/.[!.]* site/pr/$PR_NUM/ 2>/dev/null || true
+          # ensure .nojekyll (for Pages) and 404.html are present inside the subdir too
+          touch site/.nojekyll
+          cp site/.nojekyll site/pr/$PR_NUM/.nojekyll 2>/dev/null || true
+          cp site/pr/$PR_NUM/index.html site/pr/$PR_NUM/404.html 2>/dev/null || true
+          # put a placeholder at artifact root so PR deploy does not completely 404 the main URL
+          cat > site/index.html << 'HTMLEOF'
+          <!doctype html>
+          <html><head><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=pr/__PRNUM__/"></head>
+          <body>Preview for this PR is at <a href="pr/__PRNUM__/">pr/__PRNUM__/</a>. Main site is at <a href="https://knybbe.github.io/MultiCalc/">root</a>.</body></html>
+          HTMLEOF
+          sed -i 's/^          //' site/index.html
+          sed -i "s|__PRNUM__|${PR_NUM}|g" site/index.html
+          cp site/index.html site/404.html 2>/dev/null || true
+
+      - name: Add service worker stub
+        run: |
+          PR_NUM="${{ github.event.pull_request.number }}"
+          echo 'self.addEventListener("install", () => self.skipWaiting());' > site/pr/$PR_NUM/service-worker.js || true
+
+      - name: Fix paths for /MultiCalc/pr/$PR_NUM (normalize)
+        run: |
+          PR_NUM="${{ github.event.pull_request.number }}"
+          PR_PREFIX="/MultiCalc/pr/${PR_NUM}"
+          # rewrite using loop for robust quoting + var expansion (GNU sed on ubuntu runner)
+          for f in $(find site/pr/$PR_NUM -type f \( -name "*.html" -o -name "*.js" -o -name "*.css" -o -name "*.json" -o -name "manifest.webmanifest" \) 2>/dev/null); do
+            # 1. normalize double main prefix to the PR subpath prefix
+            sed -i 's|/MultiCalc/MultiCalc/|'"$PR_PREFIX"'/|g' "$f" || true
+            # 2. normalize erroneous MultiCalc nested under the pr subdir
+            sed -i 's|/MultiCalc/pr/[0-9]*/MultiCalc/|'"$PR_PREFIX"'/|g' "$f" || true
+            # 3. rebase any erroneous top-level /MultiCalc/ (not already under /pr/) 
+            sed -i 's|/MultiCalc/\(pr/[0-9]*/\)\{0,1\}\([^p]\)|'"$PR_PREFIX"'/\2|g' "$f" || true
+            # 4. prefix any remaining bare absolute paths (/" not /M...) with the PR subpath
+            sed -i 's|="\(/[^M][^"]*\)"|="'"$PR_PREFIX"'\1"|g' "$f" || true
+            sed -i "s|='\(/[^M][^']*\)'|='$PR_PREFIX\1'|g" "$f" || true
+          done || true
+
+      - name: Remove pre-compressed
+        run: find site/pr -type f \( -name "*.br" -o -name "*.gz" \) -delete || true
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./site
+
+      - name: Deploy to GitHub Pages (prerelease env)
+        id: deployment
+        uses: actions/deploy-pages@v4
+
       - name: Comment on PR with preview URL
-        if: github.event_name == 'pull_request'
         uses: actions/github-script@v7
         with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const prNumber = context.payload.pull_request.number;
             const previewUrl = `https://knybbe.github.io/MultiCalc/pr/${prNumber}/`;
