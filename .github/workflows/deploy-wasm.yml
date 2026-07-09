@@ -44,8 +44,10 @@ jobs:
       - name: Publish WASM
         run: dotnet publish MultiCalc/MultiCalc.csproj -c Release -f net10.0-browserwasm -p:TargetFrameworks=net10.0-browserwasm -p:BaseHref=/MultiCalc/ -o site --no-restore
 
-      - name: Add .nojekyll
-        run: touch site/.nojekyll
+      - name: Prepare GitHub Pages site (SPA fallback)
+        run: |
+          cp site/index.html site/404.html || true
+          touch site/.nojekyll
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
