@@ -63,7 +63,7 @@ jobs:
         id: basehref
         run: |
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            echo "value=/MultiCalc/prerelease/${{ github.event.pull_request.number }}/" >> $GITHUB_OUTPUT
+            echo "value=/MultiCalc/pr/${{ github.event.pull_request.number }}/" >> $GITHUB_OUTPUT
           else
             echo "value=/MultiCalc/" >> $GITHUB_OUTPUT
           fi
@@ -224,7 +224,7 @@ jobs:
       cancel-in-progress: true
     environment:
       name: ${{ github.event_name == 'pull_request' && 'prerelease' || 'github-pages' }}
-      url: https://knybbe.github.io/MultiCalc/${{ github.event_name == 'pull_request' && format('prerelease/{0}', github.event.pull_request.number) || '' }}
+      url: https://knybbe.github.io/MultiCalc/${{ github.event_name == 'pull_request' && format('pr/{0}', github.event.pull_request.number) || '' }}
     steps:
       # Download the artifact produced by the needed build-wasm job
       # (the job only runs after successful build-wasm on main or dispatch)
@@ -233,16 +233,6 @@ jobs:
         with:
           name: wasm
           path: site
-
-      - name: Restructure site for PR prerelease subpath
-        if: github.event_name == 'pull_request'
-        run: |
-          PR_NUM="${{ github.event.pull_request.number }}"
-          mkdir -p /tmp/pr_content
-          mv site/* /tmp/pr_content/ 2>/dev/null || true
-          mkdir -p site/prerelease/$PR_NUM
-          mv /tmp/pr_content/* site/prerelease/$PR_NUM/ 2>/dev/null || true
-          echo "Restructured for prerelease/$PR_NUM"
 
       - name: Prepare GitHub Pages site (promote wwwroot + SPA fallback)
         run: |
@@ -255,6 +245,16 @@ jobs:
 
           cp site/index.html site/404.html || true
           touch site/.nojekyll
+
+      - name: Restructure for PR pr subpath (after prepare, for subdir deploy)
+        if: github.event_name == 'pull_request'
+        run: |
+          PR_NUM="${{ github.event.pull_request.number }}"
+          mkdir -p /tmp/app
+          mv site/* /tmp/app/ 2>/dev/null || true
+          mkdir -p site/pr/$PR_NUM
+          mv /tmp/app/* site/pr/$PR_NUM/ 2>/dev/null || true
+          echo "Restructured for pr/$PR_NUM"
 
       - name: Add service worker stub (prevent 404 for PWA registration at wrong scope)
         run: |
@@ -313,7 +313,7 @@ jobs:
         with:
           script: |
             const prNumber = context.payload.pull_request.number;
-            const previewUrl = `https://knybbe.github.io/MultiCalc/prerelease/${prNumber}/`;
+            const previewUrl = `https://knybbe.github.io/MultiCalc/pr/${prNumber}/`;
             github.rest.issues.createComment({
               issue_number: prNumber,
               owner: context.repo.owner,
