@@ -44,8 +44,15 @@ jobs:
       - name: Publish WASM
         run: dotnet publish MultiCalc/MultiCalc.csproj -c Release -f net10.0-browserwasm -p:TargetFrameworks=net10.0-browserwasm -p:BaseHref=/MultiCalc/ -o site --no-restore
 
-      - name: Prepare GitHub Pages site (SPA fallback)
+      - name: Prepare GitHub Pages site (promote wwwroot + SPA fallback)
         run: |
+          # Uno WASM publish puts the app (including index.html) under wwwroot/
+          # Copy its contents up so the app is served from the site root
+          if [ -d "site/wwwroot" ]; then
+            cp -r site/wwwroot/* site/ || true
+            rm -rf site/wwwroot || true
+          fi
+
           cp site/index.html site/404.html || true
           touch site/.nojekyll
 
