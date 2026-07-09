@@ -9,7 +9,7 @@ on:
 
 jobs:
   test:
-    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -33,7 +33,7 @@ jobs:
         run: dotnet test MultiCalc.Tests.csproj --no-restore --verbosity normal --logger "console;verbosity=detailed"
 
   build-wasm:
-    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     needs: test
     runs-on: ubuntu-latest
     env:
@@ -70,7 +70,7 @@ jobs:
           retention-days: 7
 
   build-desktop-linux:
-    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     needs: test
     runs-on: ubuntu-latest
     env:
@@ -98,7 +98,7 @@ jobs:
           retention-days: 7
 
   build-windows:
-    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     needs: test
     runs-on: windows-latest
     env:
@@ -126,7 +126,7 @@ jobs:
           retention-days: 7
 
   build-android:
-    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     needs: test
     runs-on: ubuntu-latest
     env:
@@ -157,7 +157,7 @@ jobs:
           retention-days: 7
 
   build-ios-macos:
-    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     needs: test
     runs-on: macos-latest
     env:
