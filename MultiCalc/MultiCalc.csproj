@@ -29,8 +29,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Core declares matching TargetFrameworks (incl. net10.0 for tests) so no SetTargetFramework needed -->
-    <ProjectReference Include="..\MultiCalc.Core\MultiCalc.Core.csproj" />
+    <ProjectReference Include="..\MultiCalc.Core\MultiCalc.Core.csproj">
+      <SetTargetFramework>TargetFramework=net10.0</SetTargetFramework>
+    </ProjectReference>
   </ItemGroup>
 
 </Project>
