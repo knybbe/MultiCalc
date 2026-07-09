@@ -58,21 +58,35 @@ jobs:
 
       - name: Rewrite absolute paths for subfolder (/MultiCalc/)
         run: |
-          # The Uno publish often emits root-absolute paths (src="/package_...", href="/...").
-          # GitHub Pages project site is under /MultiCalc/, so rewrite them.
+          # Uno WASM (especially with package hashing) emits many root-absolute references.
+          # Rewrite them so they resolve under /MultiCalc/ on GitHub Pages.
           find site -type f \( -name "*.html" -o -name "*.js" -o -name "*.css" -o -name "*.json" -o -name "manifest.webmanifest" \) -exec \
             sed -i \
-              -e 's|src="\(/[^/"]\)|src="/MultiCalc\1|g' \
-              -e 's|href="\(/[^/"]\)|href="/MultiCalc\1|g' \
-              -e 's|url("\(/[^/"]\)|url("/MultiCalc\1|g' \
+              -e 's|"/package_|"/MultiCalc/package_|g' \
+              -e "s|'/package_|' /MultiCalc/package_|g" \
               -e 's|"/manifest.webmanifest"|"/MultiCalc/manifest.webmanifest"|g' \
               -e 's|"/favicon.ico"|"/MultiCalc/favicon.ico"|g' \
+              -e 's|"/normalize.css"|"/MultiCalc/normalize.css"|g' \
+              -e 's|"/uno.css"|"/MultiCalc/uno.css"|g' \
+              -e 's|"/Fonts.css"|"/MultiCalc/Fonts.css"|g' \
+              -e 's|"/uno-bootstrap.js"|"/MultiCalc/uno-bootstrap.js"|g' \
+              -e 's|"/uno-bootstrap.css"|"/MultiCalc/uno-bootstrap.css"|g' \
+              -e 's|"/AppManifest.js"|"/MultiCalc/AppManifest.js"|g' \
+              -e 's|src="\(/[^/"]\)|src="/MultiCalc\1|g' \
+              -e 's|href="\(/[^/"]\)|href="/MultiCalc\1|g' \
               {} + || true
 
       - name: Remove pre-compressed assets so rewritten source files are served
         run: |
           # .br and .gz contain the old absolute paths. Remove them to force serving the fixed versions.
           find site \( -name "*.br" -o -name "*.gz" \) -delete || true
+
+      - name: Ensure <base> tag for subfolder
+        run: |
+          # Help any relative loads and the app itself know the correct base.
+          if [ -f site/index.html ] && ! grep -q 'base href' site/index.html; then
+            sed -i 's|<head>|<head><base href="/MultiCalc/">|' site/index.html || true
+          fi
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
