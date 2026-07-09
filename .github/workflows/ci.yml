@@ -198,8 +198,12 @@ jobs:
           retention-days: 7
 
   deploy-wasm:
-    # Only deploy on successful build-wasm for main pushes or manual dispatch
-    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
+    # Run on PRs (for preview verification) and on main pushes (production).
+    # Only if from the same repo (not forks) for PRs to have pages permissions.
+    if: >-
+      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      github.event_name == 'workflow_dispatch'
     needs: build-wasm
     runs-on: ubuntu-latest
     permissions:
@@ -207,8 +211,8 @@ jobs:
       pages: write
       id-token: write
     concurrency:
-      group: "pages"
-      cancel-in-progress: false
+      group: "pages-${{ github.event_name == 'pull_request' && github.event.pull_request.number || 'main' }}"
+      cancel-in-progress: true
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -283,3 +287,17 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      - name: Comment on PR with preview URL
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            const previewUrl = `https://knybbe.github.io/MultiCalc/`;
+            github.rest.issues.createComment({
+              issue_number: prNumber,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `🚀 WASM preview deployed for this PR:\n\n${previewUrl}\n\n(Deployed from this run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`
+            });
