@@ -373,9 +373,18 @@ jobs:
 
           # Extra global pass to ensure integrity is stripped (SRI often survives in HTML/JS for wasm loads)
           find site/pr/$PR_NUM -type f \( -name "*.html" -o -name "*.js" -o -name "*.json" -o -name "manifest.webmanifest" \) -exec \
-            sed -i 's/ integrity="[^"]*"//g' {} + || true
+            sed -i 's/ integrity="[^"]*"//gI' {} + || true
           find site/pr/$PR_NUM -type f \( -name "*.html" -o -name "*.js" -o -name "*.json" -o -name "manifest.webmanifest" \) -exec \
-            sed -i "s/ integrity='[^']*'//g" {} + || true
+            sed -i "s/ integrity='[^']*'//gI" {} + || true
+
+          # Force strip on the actual app index.html (the one served for the subpath)
+          if [ -f site/pr/$PR_NUM/index.html ]; then
+            sed -i 's/ integrity="[^"]*"//gI' site/pr/$PR_NUM/index.html || true
+            sed -i "s/ integrity='[^']*'//gI" site/pr/$PR_NUM/index.html || true
+            sed -i 's/ integrity=[^ >]*//gI' site/pr/$PR_NUM/index.html || true
+            # Also remove any integrity in JS style inside the html if inlined
+            sed -i 's/integrity:"[^"]*"//gI' site/pr/$PR_NUM/index.html || true
+          fi
 
       - name: Remove pre-compressed
         run: find site/pr -type f \( -name "*.br" -o -name "*.gz" \) -delete || true
