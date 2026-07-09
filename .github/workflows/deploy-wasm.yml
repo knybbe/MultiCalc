@@ -56,6 +56,10 @@ jobs:
           cp site/index.html site/404.html || true
           touch site/.nojekyll
 
+      - name: Add service worker stub (prevent 404 for PWA registration at wrong scope)
+        run: |
+          echo 'self.addEventListener("install", () => self.skipWaiting());' > site/service-worker.js || true
+
       - name: Fix paths for /MultiCalc/ subfolder (normalize doubles first, then prefix)
         run: |
           # 1. Fix any double-prefix that was introduced by previous steps or BaseHref + sed combo
