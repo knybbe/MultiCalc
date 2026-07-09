@@ -83,9 +83,9 @@ public class CalculatorEngine
             try
             {
                 var dt = new DataTable();
-                var result = Convert.ToDouble(dt.Compute(_display, null));
-                _display = FormatResult(result);
-                _accumulator = result;
+                var expressionResult = Convert.ToDouble(dt.Compute(_display, null));
+                _display = FormatResult(expressionResult);
+                _accumulator = expressionResult;
                 _pendingOperator = string.Empty;
                 _isNewEntry = true;
                 _hasParens = false;
