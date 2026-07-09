@@ -299,6 +299,19 @@ jobs:
           cp site/index.html site/404.html || true
           touch site/.nojekyll
 
+      - name: Strip integrity attributes early (to prevent SRI on subpath)
+        run: |
+          # Remove all integrity attributes from the published files before restructure
+          find site -type f \( -name "*.html" -o -name "*.js" -o -name "*.json" -o -name "manifest.webmanifest" \) -exec \
+            sed -i 's/ *integrity="[^"]*"//gI' {} + || true
+          find site -type f \( -name "*.html" -o -name "*.js" -o -name "*.json" -o -name "manifest.webmanifest" \) -exec \
+            sed -i "s/ *integrity='[^']*'//gI" {} + || true
+          find site -type f \( -name "*.html" -o -name "*.js" -o -name "*.json" -o -name "manifest.webmanifest" \) -exec \
+            sed -i 's/"integrity":"[^"]*"//gI' {} + || true
+          # Explicit on index if present
+          [ -f site/index.html ] && sed -i 's/ *integrity="[^"]*"//gI' site/index.html || true
+          [ -f site/index.html ] && sed -i "s/ *integrity='[^']*'//gI" site/index.html || true
+
       - name: Restructure for pr/${{ github.event.pull_request.number }} subpath
         run: |
           PR_NUM="${{ github.event.pull_request.number }}"
