@@ -318,14 +318,16 @@ jobs:
       - name: Restructure for pr/${{ github.event.pull_request.number }} subpath
         run: |
           PR_NUM="${{ github.event.pull_request.number }}"
-          mkdir -p /tmp/app
-          shopt -s dotglob 2>/dev/null || true
-          cp -a site/* /tmp/app/ 2>/dev/null || true
-          cp -a site/.[!.]* /tmp/app/ 2>/dev/null || true
           mkdir -p site/pr/$PR_NUM
-          cp -a /tmp/app/* site/pr/$PR_NUM/ 2>/dev/null || true
-          cp -a /tmp/app/.[!.]* site/pr/$PR_NUM/ 2>/dev/null || true
-          rm -rf /tmp/app
+          # Move all current top-level content (files and dirs, including dotfiles) into the subdir
+          # This leaves site/ clean for the placeholder
+          shopt -s dotglob 2>/dev/null || true
+          for item in site/* site/.*; do
+            name=$(basename "$item")
+            if [ "$name" != "pr" ] && [ "$name" != "." ] && [ "$name" != ".." ]; then
+              mv "$item" site/pr/$PR_NUM/ 2>/dev/null || true
+            fi
+          done
           # ensure .nojekyll (for Pages) and 404.html are present inside the subdir too
           touch site/.nojekyll
           cp site/.nojekyll site/pr/$PR_NUM/.nojekyll 2>/dev/null || true
