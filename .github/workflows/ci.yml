@@ -9,7 +9,7 @@ on:
 
 jobs:
   test:
-    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -33,7 +33,8 @@ jobs:
         run: dotnet test MultiCalc.Tests.csproj --no-restore --verbosity normal --logger "console;verbosity=detailed"
 
   build-wasm:
-    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    needs: test
     runs-on: ubuntu-latest
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -58,8 +59,17 @@ jobs:
       - name: Restore
         run: dotnet restore MultiCalc/MultiCalc.csproj -p:TargetFrameworks=net10.0-browserwasm --no-dependencies
 
+      - name: Set BaseHref for deployment
+        id: basehref
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "value=/MultiCalc/pr/${{ github.event.pull_request.number }}/" >> $GITHUB_OUTPUT
+          else
+            echo "value=/MultiCalc/" >> $GITHUB_OUTPUT
+          fi
+
       - name: Publish WASM
-        run: dotnet publish MultiCalc/MultiCalc.csproj -c Release -f net10.0-browserwasm -p:TargetFrameworks=net10.0-browserwasm -o artifacts/wasm --no-restore
+        run: dotnet publish MultiCalc/MultiCalc.csproj -c Release -f net10.0-browserwasm -p:TargetFrameworks=net10.0-browserwasm -p:BaseHref=${{ steps.basehref.outputs.value }} -o artifacts/wasm --no-restore
 
       - name: Upload WASM artifact
         uses: actions/upload-artifact@v4
@@ -69,7 +79,8 @@ jobs:
           retention-days: 7
 
   build-desktop-linux:
-    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    needs: test
     runs-on: ubuntu-latest
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -96,7 +107,8 @@ jobs:
           retention-days: 7
 
   build-windows:
-    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    needs: test
     runs-on: windows-latest
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -123,7 +135,8 @@ jobs:
           retention-days: 7
 
   build-android:
-    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    needs: test
     runs-on: ubuntu-latest
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -153,7 +166,8 @@ jobs:
           retention-days: 7
 
   build-ios-macos:
-    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    needs: test
     runs-on: macos-latest
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -191,3 +205,118 @@ jobs:
           name: ios-macos
           path: artifacts/
           retention-days: 7
+
+  deploy-wasm:
+    # Run on PRs (for preview verification) and on main pushes (production).
+    # Only if from the same repo (not forks) for PRs to have pages permissions.
+    if: >-
+      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      github.event_name == 'workflow_dispatch'
+    needs: build-wasm
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    concurrency:
+      group: "pages-${{ github.event_name == 'pull_request' && github.event.pull_request.number || 'main' }}"
+      cancel-in-progress: true
+    environment:
+      name: ${{ github.event_name == 'pull_request' && 'prerelease' || 'github-pages' }}
+      url: https://knybbe.github.io/MultiCalc/${{ github.event_name == 'pull_request' && format('pr/{0}', github.event.pull_request.number) || '' }}
+    steps:
+      # Download the artifact produced by the needed build-wasm job
+      # (the job only runs after successful build-wasm on main or dispatch)
+      - name: Download WASM artifact from build-wasm
+        uses: actions/download-artifact@v4
+        with:
+          name: wasm
+          path: site
+
+      - name: Prepare GitHub Pages site (promote wwwroot + SPA fallback)
+        run: |
+          # Uno WASM publish puts the app (including index.html) under wwwroot/
+          # Copy its contents up so the app is served from the site root
+          if [ -d "site/wwwroot" ]; then
+            cp -r site/wwwroot/* site/ || true
+            rm -rf site/wwwroot || true
+          fi
+
+          cp site/index.html site/404.html || true
+          touch site/.nojekyll
+
+      - name: Restructure for PR pr subpath (after prepare, for subdir deploy)
+        if: github.event_name == 'pull_request'
+        run: |
+          PR_NUM="${{ github.event.pull_request.number }}"
+          mkdir -p /tmp/app
+          mv site/* /tmp/app/ 2>/dev/null || true
+          mkdir -p site/pr/$PR_NUM
+          mv /tmp/app/* site/pr/$PR_NUM/ 2>/dev/null || true
+          echo "Restructured for pr/$PR_NUM"
+
+      - name: Add service worker stub (prevent 404 for PWA registration at wrong scope)
+        run: |
+          echo 'self.addEventListener("install", () => self.skipWaiting());' > site/service-worker.js || true
+
+      - name: Fix paths for /MultiCalc/ subfolder (normalize doubles first, then prefix)
+        run: |
+          # 1. Fix any double-prefix that was introduced by previous steps or BaseHref + sed combo
+          find site -type f \( -name "*.html" -o -name "*.js" -o -name "*.css" -o -name "*.json" -o -name "manifest.webmanifest" \) -exec \
+            sed -i 's|/MultiCalc/MultiCalc/|/MultiCalc/|g' {} + || true
+
+          # 2. Prefix root-absolute paths that do not already start with /MultiCalc
+          # This safely handles package_ hashes, css, js, manifest, favicon etc.
+          find site -type f \( -name "*.html" -o -name "*.js" -o -name "*.css" -o -name "*.json" -o -name "manifest.webmanifest" \) -exec \
+            sed -i \
+              -e 's|="\(/[^M][^"]*\)"|="/MultiCalc\1"|g' \
+              -e "s|='\(/[^M][^']*\)'|='/MultiCalc\1'|g" \
+              -e 's|"\(/package_[^"]*\)"|"/MultiCalc\1"|g' \
+              -e "s|'\(/package_[^']*\)'|'/MultiCalc\1'|g" \
+              -e 's|"/manifest.webmanifest"|"/MultiCalc/manifest.webmanifest"|g' \
+              -e 's|"/favicon.ico"|"/MultiCalc/favicon.ico"|g' \
+              -e 's|"/normalize.css"|"/MultiCalc/normalize.css"|g' \
+              -e 's|"/uno.css"|"/MultiCalc/uno.css"|g' \
+              -e 's|"/Fonts.css"|"/MultiCalc/Fonts.css"|g' \
+              -e 's|"/uno-bootstrap.js"|"/MultiCalc/uno-bootstrap.js"|g' \
+              -e 's|"/uno-bootstrap.css"|"/MultiCalc/uno-bootstrap.css"|g' \
+              {} + || true
+
+      - name: Remove pre-compressed assets so rewritten source files are served
+        run: |
+          # .br and .gz contain the old absolute paths. Remove them to force serving the fixed versions.
+          find site \( -name "*.br" -o -name "*.gz" \) -delete || true
+
+      - name: Ensure <base> tag for subfolder
+        run: |
+          # Help any relative loads and the app itself know the correct base.
+          if [ -f site/index.html ] && ! grep -q 'base href' site/index.html; then
+            sed -i 's|<head>|<head><base href="/MultiCalc/">|' site/index.html || true
+          fi
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Comment on PR with preview URL
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            const previewUrl = `https://knybbe.github.io/MultiCalc/pr/${prNumber}/`;
+            github.rest.issues.createComment({
+              issue_number: prNumber,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `🚀 WASM preview deployed for this PR:\n\n${previewUrl}\n\n(Deployed from this run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`
+            });

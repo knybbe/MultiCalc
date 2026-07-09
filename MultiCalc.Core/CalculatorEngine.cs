@@ -1,4 +1,5 @@
 using System;
+using System.Data;
 using System.Globalization;
 
 namespace MultiCalc;
@@ -14,6 +15,7 @@ public class CalculatorEngine
     private string _pendingOperator = string.Empty;
     private bool _isNewEntry = true;
     private bool _hasError = false;
+    private bool _hasParens = false;
 
     public string Display => _hasError ? "Error" : _display;
 
@@ -73,7 +75,29 @@ public class CalculatorEngine
 
     public void Calculate()
     {
-        if (_hasError || string.IsNullOrEmpty(_pendingOperator))
+        if (_hasError) return;
+
+        if (_hasParens || _display.Contains('(') || _display.Contains(')'))
+        {
+            // Use full expression evaluation for parenthesis support (supports precedence and grouping)
+            try
+            {
+                var dt = new DataTable();
+                var expressionResult = Convert.ToDouble(dt.Compute(_display, null));
+                _display = FormatResult(expressionResult);
+                _accumulator = expressionResult;
+                _pendingOperator = string.Empty;
+                _isNewEntry = true;
+                _hasParens = false;
+            }
+            catch
+            {
+                SetError();
+            }
+            return;
+        }
+
+        if (string.IsNullOrEmpty(_pendingOperator))
         {
             _isNewEntry = true;
             return;
@@ -121,6 +145,7 @@ public class CalculatorEngine
         _pendingOperator = string.Empty;
         _isNewEntry = true;
         _hasError = false;
+        _hasParens = false;
     }
 
     public void ClearEntry()
@@ -175,6 +200,32 @@ public class CalculatorEngine
     {
         _display = FormatResult(value);
         _isNewEntry = true;
+    }
+
+    public void InputOpenParenthesis()
+    {
+        if (_hasError) Clear();
+
+        if (!_isNewEntry && string.IsNullOrEmpty(_pendingOperator))
+        {
+            // implicit multiply, e.g. 2(
+            _display += "*(";
+        }
+        else
+        {
+            _display += "(";
+        }
+        _isNewEntry = true;
+        _hasParens = true;
+    }
+
+    public void InputCloseParenthesis()
+    {
+        if (_hasError) return;
+
+        _display += ")";
+        _isNewEntry = false;
+        _hasParens = true;
     }
 
     private void SetError()
