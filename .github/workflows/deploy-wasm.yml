@@ -56,6 +56,24 @@ jobs:
           cp site/index.html site/404.html || true
           touch site/.nojekyll
 
+      - name: Rewrite absolute paths for subfolder (/MultiCalc/)
+        run: |
+          # The Uno publish often emits root-absolute paths (src="/package_...", href="/...").
+          # GitHub Pages project site is under /MultiCalc/, so rewrite them.
+          find site -type f \( -name "*.html" -o -name "*.js" -o -name "*.css" -o -name "*.json" -o -name "manifest.webmanifest" \) -exec \
+            sed -i \
+              -e 's|src="\(/[^/"]\)|src="/MultiCalc\1|g' \
+              -e 's|href="\(/[^/"]\)|href="/MultiCalc\1|g' \
+              -e 's|url("\(/[^/"]\)|url("/MultiCalc\1|g' \
+              -e 's|"/manifest.webmanifest"|"/MultiCalc/manifest.webmanifest"|g' \
+              -e 's|"/favicon.ico"|"/MultiCalc/favicon.ico"|g' \
+              {} + || true
+
+      - name: Remove pre-compressed assets so rewritten source files are served
+        run: |
+          # .br and .gz contain the old absolute paths. Remove them to force serving the fixed versions.
+          find site \( -name "*.br" -o -name "*.gz" \) -delete || true
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
