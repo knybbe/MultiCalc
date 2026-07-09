@@ -1,7 +1,9 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Uno.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <!-- Single net10.0 by default (for tests etc); overridden via -p:TargetFrameworks=... in CI per-platform jobs.
+         Uno.Sdk allows the special TFMs like net10.0-desktop / browserwasm when overridden. -->
+    <TargetFrameworks>net10.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <!-- Ensure this remains a library even when built for special TFMs like browserwasm -->

@@ -15,7 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Reference Core library for engine tests (Core uses Uno.Sdk base for TFM compatibility in multi-target builds) -->
+    <!-- Reference Core library for engine tests -->
     <ProjectReference Include="..\MultiCalc.Core\MultiCalc.Core.csproj" />
   </ItemGroup>
 
