@@ -9,4 +9,9 @@
     <!-- Ensure this remains a library even when built for special TFMs like browserwasm -->
     <OutputType>Library</OutputType>
   </PropertyGroup>
+
+  <!-- Align with app's SkiaRenderer to ensure correct implicit packages (esp. for browserwasm Skia) and avoid UNOB0017 when referenced. -->
+  <PropertyGroup>
+    <UnoFeatures>SkiaRenderer;</UnoFeatures>
+  </PropertyGroup>
 </Project>
