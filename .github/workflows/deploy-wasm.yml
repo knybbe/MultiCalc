@@ -56,14 +56,20 @@ jobs:
           cp site/index.html site/404.html || true
           touch site/.nojekyll
 
-      - name: Rewrite absolute paths for subfolder (/MultiCalc/)
+      - name: Fix paths for /MultiCalc/ subfolder (normalize doubles first, then prefix)
         run: |
-          # Uno WASM (especially with package hashing) emits many root-absolute references.
-          # Rewrite them so they resolve under /MultiCalc/ on GitHub Pages.
+          # 1. Fix any double-prefix that was introduced by previous steps or BaseHref + sed combo
+          find site -type f \( -name "*.html" -o -name "*.js" -o -name "*.css" -o -name "*.json" -o -name "manifest.webmanifest" \) -exec \
+            sed -i 's|/MultiCalc/MultiCalc/|/MultiCalc/|g' {} + || true
+
+          # 2. Prefix root-absolute paths that do not already start with /MultiCalc
+          # This safely handles package_ hashes, css, js, manifest, favicon etc.
           find site -type f \( -name "*.html" -o -name "*.js" -o -name "*.css" -o -name "*.json" -o -name "manifest.webmanifest" \) -exec \
             sed -i \
-              -e 's|"/package_|"/MultiCalc/package_|g' \
-              -e "s|'/package_|' /MultiCalc/package_|g" \
+              -e 's|="\(/[^M][^"]*\)"|="/MultiCalc\1"|g' \
+              -e "s|='\(/[^M][^']*\)'|='/MultiCalc\1'|g" \
+              -e 's|"\(/package_[^"]*\)"|"/MultiCalc\1"|g' \
+              -e "s|'\(/package_[^']*\)'|'/MultiCalc\1'|g" \
               -e 's|"/manifest.webmanifest"|"/MultiCalc/manifest.webmanifest"|g' \
               -e 's|"/favicon.ico"|"/MultiCalc/favicon.ico"|g' \
               -e 's|"/normalize.css"|"/MultiCalc/normalize.css"|g' \
@@ -71,9 +77,6 @@ jobs:
               -e 's|"/Fonts.css"|"/MultiCalc/Fonts.css"|g' \
               -e 's|"/uno-bootstrap.js"|"/MultiCalc/uno-bootstrap.js"|g' \
               -e 's|"/uno-bootstrap.css"|"/MultiCalc/uno-bootstrap.css"|g' \
-              -e 's|"/AppManifest.js"|"/MultiCalc/AppManifest.js"|g' \
-              -e 's|src="\(/[^/"]\)|src="/MultiCalc\1|g' \
-              -e 's|href="\(/[^/"]\)|href="/MultiCalc\1|g' \
               {} + || true
 
       - name: Remove pre-compressed assets so rewritten source files are served
