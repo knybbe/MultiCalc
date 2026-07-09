@@ -173,4 +173,68 @@ public class CalculatorEngineTests
         _calc.InputDigit('7');
         Assert.Equal("7", _calc.Display);
     }
+
+    [Fact]
+    public void FullExpressionShowsAsIs()
+    {
+        _calc.Clear();
+        _calc.InputDigit('2');
+        _calc.InputOperator("*");
+        _calc.InputDigit('2');
+        _calc.InputOperator("+");
+        _calc.InputDigit('3');
+        Assert.Equal("2*2+3", _calc.Display);  // expression visible as typed
+    }
+
+    [Fact]
+    public void EvaluateOnEquals()
+    {
+        _calc.Clear();
+        _calc.InputDigit('2');
+        _calc.InputOperator("*");
+        _calc.InputDigit('2');
+        _calc.InputOperator("+");
+        _calc.InputDigit('3');
+        _calc.Calculate();
+        Assert.Equal("7", _calc.Display);
+    }
+
+    [Fact]
+    public void ParenthesesWorkWithPrecedence()
+    {
+        _calc.Clear();
+        _calc.InputOpenParenthesis();
+        _calc.InputDigit('1');
+        _calc.InputOperator("+");
+        _calc.InputDigit('2');
+        _calc.InputCloseParenthesis();
+        _calc.InputOperator("*");
+        _calc.InputDigit('3');
+        _calc.Calculate();
+        Assert.Equal("9", _calc.Display);  // (1+2)*3
+    }
+
+    [Fact]
+    public void DirectSetExpressionAndEvaluate()
+    {
+        _calc.SetExpression("10-3-2");
+        _calc.Calculate();
+        Assert.Equal("5", _calc.Display);
+    }
+
+    [Fact]
+    public void KeyboardStyleTypingViaAppends()
+    {
+        _calc.Clear();
+        // simulate typing  (1+2)*3=
+        _calc.InputOpenParenthesis();
+        _calc.InputDigit('1');
+        _calc.InputOperator("+");
+        _calc.InputDigit('2');
+        _calc.InputCloseParenthesis();
+        _calc.InputOperator("*");
+        _calc.InputDigit('3');
+        _calc.Calculate();
+        Assert.Equal("9", _calc.Display);
+    }
 }

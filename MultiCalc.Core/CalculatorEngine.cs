@@ -1,6 +1,7 @@
 using System;
 using System.Data;
 using System.Globalization;
+using System.Linq;
 
 namespace MultiCalc;
 
@@ -10,47 +11,49 @@ namespace MultiCalc;
 /// </summary>
 public class CalculatorEngine
 {
-    private string _display = "0";
-    private double _accumulator = 0;
-    private string _pendingOperator = string.Empty;
-    private bool _isNewEntry = true;
+    private string _expression = "0";
     private bool _hasError = false;
-    private bool _hasParens = false;
+    private bool _justEvaluated = false;
 
-    public string Display => _hasError ? "Error" : _display;
+    public string Display => _hasError ? "Error" : _expression;
 
-    public string CurrentOperation => string.IsNullOrEmpty(_pendingOperator) ? string.Empty : _pendingOperator;
+    public string CurrentOperation => string.Empty; // no longer used in expression mode
 
     public void InputDigit(char digit)
     {
         if (_hasError) Clear();
 
-        if (_isNewEntry)
+        if (_justEvaluated)
         {
-            _display = digit.ToString();
-            _isNewEntry = false;
+            _expression = digit.ToString();
+            _justEvaluated = false;
+            return;
         }
+
+        if (_expression == "0")
+            _expression = digit.ToString();
         else
-        {
-            if (_display == "0")
-                _display = digit.ToString();
-            else
-                _display += digit;
-        }
+            _expression += digit;
     }
 
     public void InputDecimal()
     {
         if (_hasError) Clear();
 
-        if (_isNewEntry)
+        if (_justEvaluated)
         {
-            _display = "0.";
-            _isNewEntry = false;
+            _expression = "0.";
+            _justEvaluated = false;
+            return;
         }
-        else if (!_display.Contains("."))
+
+        if (_expression == "0" || string.IsNullOrEmpty(_expression))
         {
-            _display += ".";
+            _expression = "0.";
+        }
+        else if (!_expression.EndsWith("."))
+        {
+            _expression += ".";
         }
     }
 
@@ -58,182 +61,173 @@ public class CalculatorEngine
     {
         if (_hasError) return;
 
-        if (!string.IsNullOrEmpty(_pendingOperator) && !_isNewEntry)
+        if (_justEvaluated)
         {
-            Calculate();
-            if (_hasError) return;
+            _justEvaluated = false;
+            // continue expression from the result, e.g. "5+"
         }
 
-        if (double.TryParse(_display, NumberStyles.Any, CultureInfo.InvariantCulture, out double value))
-        {
-            _accumulator = value;
-        }
-
-        _pendingOperator = op;
-        _isNewEntry = true;
+        _expression += op;
     }
 
     public void Calculate()
     {
         if (_hasError) return;
 
-        if (_hasParens || _display.Contains('(') || _display.Contains(')'))
+        if (string.IsNullOrWhiteSpace(_expression))
         {
-            // Use full expression evaluation for parenthesis support (supports precedence and grouping)
-            try
-            {
-                var dt = new DataTable();
-                var expressionResult = Convert.ToDouble(dt.Compute(_display, null));
-                _display = FormatResult(expressionResult);
-                _accumulator = expressionResult;
-                _pendingOperator = string.Empty;
-                _isNewEntry = true;
-                _hasParens = false;
-            }
-            catch
-            {
-                SetError();
-            }
+            _expression = "0";
             return;
         }
 
-        if (string.IsNullOrEmpty(_pendingOperator))
-        {
-            _isNewEntry = true;
-            return;
-        }
-
-        if (!double.TryParse(_display, NumberStyles.Any, CultureInfo.InvariantCulture, out double current))
-        {
-            SetError();
-            return;
-        }
-
-        double result;
         try
         {
-            result = _pendingOperator switch
-            {
-                "+" => _accumulator + current,
-                "-" => _accumulator - current,
-                "×" or "*" => _accumulator * current,
-                "÷" or "/" => current == 0 ? throw new DivideByZeroException() : _accumulator / current,
-                _ => current
-            };
-        }
-        catch (DivideByZeroException)
-        {
-            SetError();
-            return;
+            string toCompute = NormalizeForCompute(_expression);
+            var dt = new DataTable();
+            var result = Convert.ToDouble(dt.Compute(toCompute, null));
+            _expression = FormatResult(result);
+            _justEvaluated = true;
         }
         catch
         {
             SetError();
-            return;
         }
+    }
 
-        _display = FormatResult(result);
-        _accumulator = result;
-        _pendingOperator = string.Empty;
-        _isNewEntry = true;
+    private string NormalizeForCompute(string expr)
+    {
+        if (string.IsNullOrEmpty(expr)) return "0";
+        return expr
+            .Replace("×", "*")
+            .Replace("÷", "/")
+            .Replace("−", "-")
+            .Replace(" ", "")
+            .Trim();
     }
 
     public void Clear()
     {
-        _display = "0";
-        _accumulator = 0;
-        _pendingOperator = string.Empty;
-        _isNewEntry = true;
+        _expression = "0";
         _hasError = false;
-        _hasParens = false;
+        _justEvaluated = false;
     }
 
     public void ClearEntry()
     {
-        _display = "0";
-        _isNewEntry = true;
+        _expression = "0";
+        _justEvaluated = false;
     }
 
     public void Negate()
     {
-        if (_hasError || _display == "0") return;
+        if (_hasError || _expression == "0" || string.IsNullOrEmpty(_expression)) return;
 
-        if (_display.StartsWith("-"))
-            _display = _display[1..];
+        if (_justEvaluated)
+            _justEvaluated = false;
+
+        if (_expression.StartsWith("-"))
+            _expression = _expression[1..];
         else
-            _display = "-" + _display;
+            _expression = "-" + _expression;
     }
 
     public void Percent()
     {
         if (_hasError) return;
 
-        if (double.TryParse(_display, NumberStyles.Any, CultureInfo.InvariantCulture, out double value))
+        if (_justEvaluated)
+            _justEvaluated = false;
+
+        // Try to treat current expression (or last simple number) as value
+        string toEval = NormalizeForCompute(_expression);
+        if (double.TryParse(toEval, NumberStyles.Any, CultureInfo.InvariantCulture, out double value) ||
+            (toEval.Length > 0 && double.TryParse(toEval.Split(new[] { '+', '-', '*', '/', '(', ')' }, StringSplitOptions.RemoveEmptyEntries).LastOrDefault() ?? "0", out value)))
         {
-            // Simple percent: divide current by 100. For 200 + 10% semantics, caller/UI can use differently.
             double result = value / 100.0;
-            _display = FormatResult(result);
-            _isNewEntry = true;
+            _expression = FormatResult(result);
+            _justEvaluated = true;
         }
     }
 
     public void Backspace()
     {
-        if (_hasError || _isNewEntry)
+        if (_hasError || _expression == "Error")
         {
             ClearEntry();
             return;
         }
 
-        if (_display.Length <= 1 || (_display.Length == 2 && _display.StartsWith("-")))
+        if (_justEvaluated)
         {
-            _display = "0";
-            _isNewEntry = true;
+            _justEvaluated = false;
+            // fallthrough to edit the result value
+        }
+
+        if (_expression.Length <= 1 || (_expression.Length == 2 && _expression.StartsWith("-")))
+        {
+            _expression = "0";
+            _justEvaluated = false;
         }
         else
         {
-            _display = _display[..^1];
+            _expression = _expression[..^1];
         }
     }
 
     public void SetValue(double value)
     {
-        _display = FormatResult(value);
-        _isNewEntry = true;
+        _expression = FormatResult(value);
+        _justEvaluated = true;
+    }
+
+    public void SetExpression(string value)
+    {
+        _expression = value ?? "0";
+        _hasError = false;
+        _justEvaluated = false;
     }
 
     public void InputOpenParenthesis()
     {
         if (_hasError) Clear();
 
-        if (!_isNewEntry && string.IsNullOrEmpty(_pendingOperator))
+        if (_justEvaluated)
         {
-            // implicit multiply, e.g. 2(
-            _display += "*(";
+            _justEvaluated = false;
+            _expression = "(";  // after a result, start a fresh sub-expression
+            return;
+        }
+
+        if (_expression == "0" || string.IsNullOrEmpty(_expression))
+        {
+            _expression = "(";
+        }
+        else if (char.IsDigit(_expression[^1]) || _expression[^1] == ')')
+        {
+            // implicit multiply before (
+            _expression += "*(";
         }
         else
         {
-            _display += "(";
+            _expression += "(";
         }
-        _isNewEntry = true;
-        _hasParens = true;
     }
 
     public void InputCloseParenthesis()
     {
         if (_hasError) return;
 
-        _display += ")";
-        _isNewEntry = false;
-        _hasParens = true;
+        if (_justEvaluated)
+            _justEvaluated = false;
+
+        _expression += ")";
     }
 
     private void SetError()
     {
         _hasError = true;
-        _display = "Error";
-        _pendingOperator = string.Empty;
-        _isNewEntry = true;
+        _expression = "Error";
+        _justEvaluated = true;
     }
 
     private static string FormatResult(double value)
