@@ -241,12 +241,11 @@ jobs:
 
       - name: Fix paths for /MultiCalc/ (normalize)
         run: |
-          find site -type f \( -name "*.html" -o -name "*.js" -o -name "*.css" -o -name "*.json" -o -name "manifest.webmanifest" \) -exec sed -i 's|/MultiCalc/MultiCalc/|/MultiCalc/|g' {} + || true
-          find site -type f \( -name "*.html" -o -name "*.js" -o -name "*.css" -o -name "*.json" -o -name "manifest.webmanifest" \) -exec \
-            sed -i \
-              -e 's|="\(/[^M][^"]*\)"|="/MultiCalc\1"|g' \
-              -e "s|='\(/[^M][^']*\)'|='/MultiCalc\1'|g" \
-              {} + || true
+          for f in $(find site -type f \( -name "*.html" -o -name "*.js" -o -name "*.css" -o -name "*.json" -o -name "manifest.webmanifest" \) 2>/dev/null); do
+            sed -i 's|/MultiCalc/MultiCalc/|/MultiCalc/|g' "$f" || true
+            sed -i 's|="\(/[^M][^"]*\)"|="/MultiCalc\1"|g' "$f" || true
+            sed -i "s|='\(/[^M][^']*\)'|='/MultiCalc\1'|g" "$f" || true
+          done || true
 
       - name: Remove pre-compressed
         run: find site \( -name "*.br" -o -name "*.gz" \) -delete || true
@@ -297,23 +296,47 @@ jobs:
         run: |
           PR_NUM="${{ github.event.pull_request.number }}"
           mkdir -p /tmp/app
+          shopt -s dotglob 2>/dev/null || true
           mv site/* /tmp/app/ 2>/dev/null || true
+          mv site/.[!.]* /tmp/app/ 2>/dev/null || true
           mkdir -p site/pr/$PR_NUM
           mv /tmp/app/* site/pr/$PR_NUM/ 2>/dev/null || true
+          mv /tmp/app/.[!.]* site/pr/$PR_NUM/ 2>/dev/null || true
+          # ensure .nojekyll (for Pages) and 404.html are present inside the subdir too
+          touch site/.nojekyll
+          cp site/.nojekyll site/pr/$PR_NUM/.nojekyll 2>/dev/null || true
+          cp site/pr/$PR_NUM/index.html site/pr/$PR_NUM/404.html 2>/dev/null || true
+          # put a placeholder at artifact root so PR deploy does not completely 404 the main URL
+          cat > site/index.html << 'HTMLEOF'
+          <!doctype html>
+          <html><head><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=pr/__PRNUM__/"></head>
+          <body>Preview for this PR is at <a href="pr/__PRNUM__/">pr/__PRNUM__/</a>. Main site is at <a href="https://knybbe.github.io/MultiCalc/">root</a>.</body></html>
+          HTMLEOF
+          sed -i 's/^          //' site/index.html
+          sed -i "s|__PRNUM__|${PR_NUM}|g" site/index.html
+          cp site/index.html site/404.html 2>/dev/null || true
 
       - name: Add service worker stub
-        run: echo 'self.addEventListener("install", () => self.skipWaiting());' > site/pr/$PR_NUM/service-worker.js || true
+        run: |
+          PR_NUM="${{ github.event.pull_request.number }}"
+          echo 'self.addEventListener("install", () => self.skipWaiting());' > site/pr/$PR_NUM/service-worker.js || true
 
       - name: Fix paths for /MultiCalc/pr/$PR_NUM (normalize)
         run: |
           PR_NUM="${{ github.event.pull_request.number }}"
-          find site/pr/$PR_NUM -type f \( -name "*.html" -o -name "*.js" -o -name "*.css" -o -name "*.json" -o -name "manifest.webmanifest" \) -exec \
-            sed -i 's|/MultiCalc/MultiCalc/|/MultiCalc/|g' {} + || true
-          find site/pr/$PR_NUM -type f \( -name "*.html" -o -name "*.js" -o -name "*.css" -o -name "*.json" -o -name "manifest.webmanifest" \) -exec \
-            sed -i \
-              -e 's|="\(/[^M][^"]*\)"|="/MultiCalc\1"|g' \
-              -e "s|='\(/[^M][^']*\)'|='/MultiCalc\1'|g' \
-              {} + || true
+          PR_PREFIX="/MultiCalc/pr/${PR_NUM}"
+          # rewrite using loop for robust quoting + var expansion (GNU sed on ubuntu runner)
+          for f in $(find site/pr/$PR_NUM -type f \( -name "*.html" -o -name "*.js" -o -name "*.css" -o -name "*.json" -o -name "manifest.webmanifest" \) 2>/dev/null); do
+            # 1. normalize double main prefix to the PR subpath prefix
+            sed -i 's|/MultiCalc/MultiCalc/|'"$PR_PREFIX"'/|g' "$f" || true
+            # 2. normalize erroneous MultiCalc nested under the pr subdir
+            sed -i 's|/MultiCalc/pr/[0-9]*/MultiCalc/|'"$PR_PREFIX"'/|g' "$f" || true
+            # 3. rebase any erroneous top-level /MultiCalc/ (not already under /pr/) 
+            sed -i 's|/MultiCalc/\(pr/[0-9]*/\)\{0,1\}\([^p]\)|'"$PR_PREFIX"'/\2|g' "$f" || true
+            # 4. prefix any remaining bare absolute paths (/" not /M...) with the PR subpath
+            sed -i 's|="\(/[^M][^"]*\)"|="'"$PR_PREFIX"'\1"|g' "$f" || true
+            sed -i "s|='\(/[^M][^']*\)'|='$PR_PREFIX\1'|g" "$f" || true
+          done || true
 
       - name: Remove pre-compressed
         run: find site/pr -type f \( -name "*.br" -o -name "*.gz" \) -delete || true
