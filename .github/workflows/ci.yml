@@ -346,18 +346,29 @@ jobs:
             sed -i "s|='\(/[^M][^']*\)'|='$PR_PREFIX\1'|g" "$f" || true
 
             # 5. Broader fixes for Uno WASM dynamic loaders (require.js, uno-bootstrap, package hash, _framework)
-            # These often appear as "/package_xxx/..." or "/_framework/..." in JS arrays/strings, not just attributes.
-            sed -i 's|"/_\([^"/]\)|"/'"$PR_PREFIX"'/_\1|g' "$f" || true
-            sed -i "s|'/_\([^'/]\)|'/ $PR_PREFIX /_\1|g" "$f" || true
-            sed -i 's|"/package_\([^"/]\)|"/'"$PR_PREFIX"'/package_\1|g' "$f" || true
-            sed -i "s|'/package_\([^'/]\)|'/ $PR_PREFIX /package_\1|g" "$f" || true
-            # Also catch common array forms used by require/define
-            sed -i 's|\["/\(_\|package_\)\([^"]*\)"|["/'"$PR_PREFIX"'/\1\2"|g' "$f" || true
+            # Prefix bare asset roots only when they start with "/package_ or "/_ (safe, won't double-prefix already fixed paths)
+            sed -i 's|"/package_\([^"]*\)"|"/'"$PR_PREFIX"'/package_\1"|g' "$f" || true
+            sed -i "s|'/package_\([^']*\)'|'/ $PR_PREFIX /package_\1'|g" "$f" || true
+            sed -i 's|"/_\([^"]*\)"|"/'"$PR_PREFIX"'/_\1"|g' "$f" || true
+            sed -i "s|'/_\([^']*\)'|'/ $PR_PREFIX /_\1'|g" "$f" || true
+            # Also direct (for cases without surrounding quotes in the match)
+            sed -i 's|"/package_|"/'"$PR_PREFIX"'/package_|g' "$f" || true
+            sed -i 's|"/_|"/'"$PR_PREFIX"'/_|g' "$f" || true
 
             # 6. Strip integrity attributes — post-processing + subpath deploys frequently break SRI hashes
+            # Cover HTML, JS strings, JSON etc.
             sed -i 's/ integrity="[^"]*"//g' "$f" || true
             sed -i "s/ integrity='[^']*'//g" "$f" || true
             sed -i 's/ integrity=[^ >]*//g' "$f" || true
+            sed -i 's/integrity:"[^"]*"//g' "$f" || true
+            sed -i "s/integrity:'[^']*'//g" "$f" || true
+            sed -i 's/"integrity":"[^"]*"//g' "$f" || true
+
+            # 7. Cleanup any malformed prefixes (e.g. //MultiCalc from concat or partial rewrites)
+            sed -i 's|//MultiCalc/pr/|/MultiCalc/pr/|g' "$f" || true
+            sed -i 's|//MultiCalc/|/MultiCalc/|g' "$f" || true
+            sed -i 's|//pr/|pr/|g' "$f" || true
+            sed -i 's|"/MultiCalc/pr/[^"]*/MultiCalc/pr/|"/MultiCalc/pr/|g' "$f" || true
           done || true
 
       - name: Remove pre-compressed
