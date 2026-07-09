@@ -5,5 +5,7 @@
     <TargetFrameworks>net10.0;net10.0-android;net10.0-ios;net10.0-browserwasm;net10.0-desktop</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <!-- Ensure this remains a library even when built for special TFMs like browserwasm -->
+    <OutputType>Library</OutputType>
   </PropertyGroup>
 </Project>

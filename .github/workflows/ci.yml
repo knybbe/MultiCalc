@@ -53,7 +53,7 @@ jobs:
         run: dotnet workload install wasm-tools
 
       - name: Restore Core
-        run: dotnet restore MultiCalc.Core/MultiCalc.Core.csproj -p:TargetFrameworks=net10.0
+        run: dotnet restore MultiCalc.Core/MultiCalc.Core.csproj -p:TargetFrameworks=net10.0-browserwasm
 
       - name: Restore
         run: dotnet restore MultiCalc/MultiCalc.csproj -p:TargetFrameworks=net10.0-browserwasm --no-dependencies
