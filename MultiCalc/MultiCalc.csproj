@@ -29,9 +29,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\MultiCalc.Core\MultiCalc.Core.csproj">
-      <SetTargetFramework>TargetFramework=net10.0</SetTargetFramework>
-    </ProjectReference>
+    <!-- Core uses matching TargetFrameworks; reference uses default matching -->
+    <ProjectReference Include="..\MultiCalc.Core\MultiCalc.Core.csproj" />
   </ItemGroup>
 
 </Project>

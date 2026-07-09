@@ -4,5 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <!-- Ensure this remains a library even when built for special TFMs like browserwasm -->
+    <OutputType>Library</OutputType>
   </PropertyGroup>
 </Project>
