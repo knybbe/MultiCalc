@@ -60,7 +60,7 @@ jobs:
         run: dotnet restore MultiCalc/MultiCalc.csproj -p:TargetFrameworks=net10.0-browserwasm --no-dependencies
 
       - name: Publish WASM
-        run: dotnet publish MultiCalc/MultiCalc.csproj -c Release -f net10.0-browserwasm -p:TargetFrameworks=net10.0-browserwasm -o artifacts/wasm --no-restore
+        run: dotnet publish MultiCalc/MultiCalc.csproj -c Release -f net10.0-browserwasm -p:TargetFrameworks=net10.0-browserwasm -p:BaseHref=/MultiCalc/ -o artifacts/wasm --no-restore
 
       - name: Upload WASM artifact
         uses: actions/upload-artifact@v4
