@@ -13,29 +13,24 @@
           RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto"
           ColumnDefinitions="*,*,*,*">
 
-        <!-- Display area with calculator look -->
+        <!-- Display area: editable expression field -->
         <Border Grid.Row="0" Grid.RowSpan="2" Grid.ColumnSpan="4"
                 Background="#1C1C1E"
                 CornerRadius="6"
                 Padding="8,6"
                 Margin="0,0,0,4">
-            <StackPanel>
-                <!-- Secondary / operation display -->
-                <TextBlock x:Name="OperationDisplay"
-                           Text=""
-                           FontSize="14"
-                           HorizontalAlignment="Right"
-                           Foreground="#8E8E93" />
-
-                <!-- Main result display -->
-                <TextBlock x:Name="ResultDisplay"
-                           Text="0"
-                           FontSize="36"
-                           FontWeight="SemiBold"
-                           HorizontalAlignment="Right"
-                           Foreground="White"
-                           TextTrimming="CharacterEllipsis" />
-            </StackPanel>
+            <TextBox x:Name="ExpressionInput"
+                     Text="0"
+                     FontSize="36"
+                     FontWeight="SemiBold"
+                     HorizontalAlignment="Stretch"
+                     HorizontalContentAlignment="Right"
+                     VerticalAlignment="Center"
+                     BorderThickness="0"
+                     Background="Transparent"
+                     Foreground="White"
+                     Padding="4,2"
+                     TextChanged="OnExpressionChanged" />
         </Border>
 
         <!-- Row 2: ( , ) -->

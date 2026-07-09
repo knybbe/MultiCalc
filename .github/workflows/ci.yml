@@ -245,6 +245,12 @@ jobs:
             sed -i 's|/MultiCalc/MultiCalc/|/MultiCalc/|g' "$f" || true
             sed -i 's|="\(/[^M][^"]*\)"|="/MultiCalc\1"|g' "$f" || true
             sed -i "s|='\(/[^M][^']*\)'|='/MultiCalc\1'|g" "$f" || true
+
+            # Broader Uno asset paths + strip integrity (helps with any post-processing)
+            sed -i 's|"/_\([^"/]\)|"/MultiCalc/_\1|g' "$f" || true
+            sed -i 's|"/package_\([^"/]\)|"/MultiCalc/package_\1|g' "$f" || true
+            sed -i 's/ integrity="[^"]*"//g' "$f" || true
+            sed -i "s/ integrity='[^']*'//g" "$f" || true
           done || true
 
       - name: Remove pre-compressed
@@ -293,16 +299,29 @@ jobs:
           cp site/index.html site/404.html || true
           touch site/.nojekyll
 
+      - name: Strip integrity attributes early (to prevent SRI on subpath)
+        run: |
+          # Remove all integrity attributes from the published files before restructure
+          find site -type f \( -name "*.html" -o -name "*.js" -o -name "*.json" -o -name "manifest.webmanifest" \) -exec \
+            sed -i 's/ *integrity="[^"]*"//gI' {} + || true
+          find site -type f \( -name "*.html" -o -name "*.js" -o -name "*.json" -o -name "manifest.webmanifest" \) -exec \
+            sed -i "s/ *integrity='[^']*'//gI" {} + || true
+          find site -type f \( -name "*.html" -o -name "*.js" -o -name "*.json" -o -name "manifest.webmanifest" \) -exec \
+            sed -i 's/"integrity":"[^"]*"//gI' {} + || true
+          # Clear hashes in boot json / manifest to disable SRI in JS loader (set to empty)
+          find site -type f \( -name "*.json" -o -name "manifest.webmanifest" \) -exec \
+            sed -i 's/"sha256-[^"]*"/""/g' {} + || true
+          # Explicit on index if present
+          [ -f site/index.html ] && sed -i 's/ *integrity="[^"]*"//gI' site/index.html || true
+          [ -f site/index.html ] && sed -i "s/ *integrity='[^']*'//gI" site/index.html || true
+
       - name: Restructure for pr/${{ github.event.pull_request.number }} subpath
         run: |
           PR_NUM="${{ github.event.pull_request.number }}"
-          mkdir -p /tmp/app
-          shopt -s dotglob 2>/dev/null || true
-          mv site/* /tmp/app/ 2>/dev/null || true
-          mv site/.[!.]* /tmp/app/ 2>/dev/null || true
           mkdir -p site/pr/$PR_NUM
-          mv /tmp/app/* site/pr/$PR_NUM/ 2>/dev/null || true
-          mv /tmp/app/.[!.]* site/pr/$PR_NUM/ 2>/dev/null || true
+          # Move all current top-level items (files, dirs, dotfiles) into the subdir, excluding the pr dir itself
+          # This is more reliable than cp via /tmp for ensuring all _framework files are included
+          find site -mindepth 1 -maxdepth 1 ! -path 'site/pr' -exec mv {} site/pr/$PR_NUM/ \;
           # ensure .nojekyll (for Pages) and 404.html are present inside the subdir too
           touch site/.nojekyll
           cp site/.nojekyll site/pr/$PR_NUM/.nojekyll 2>/dev/null || true
@@ -317,6 +336,18 @@ jobs:
           sed -i "s|__PRNUM__|${PR_NUM}|g" site/index.html
           cp site/index.html site/404.html 2>/dev/null || true
 
+      - name: Verify restructure
+        run: |
+          PR_NUM="${{ github.event.pull_request.number }}"
+          echo "=== After restructure ==="
+          ls -ld site/pr/$PR_NUM 2>/dev/null || echo "No pr dir"
+          echo "=== _framework present? ==="
+          ls -ld site/pr/$PR_NUM/_framework 2>/dev/null || echo "MISSING _framework"
+          echo "=== Specific wasm file ==="
+          ls -l site/pr/$PR_NUM/_framework/System.Linq.6s0kut8m82.wasm 2>/dev/null || echo "MISSING System.Linq.6s0kut8m82.wasm"
+          echo "=== Number of .wasm ==="
+          find site/pr/$PR_NUM/_framework -name '*.wasm' 2>/dev/null | wc -l || echo 0
+
       - name: Add service worker stub
         run: |
           PR_NUM="${{ github.event.pull_request.number }}"
@@ -328,19 +359,128 @@ jobs:
           PR_PREFIX="/MultiCalc/pr/${PR_NUM}"
           # rewrite using loop for robust quoting + var expansion (GNU sed on ubuntu runner)
           for f in $(find site/pr/$PR_NUM -type f \( -name "*.html" -o -name "*.js" -o -name "*.css" -o -name "*.json" -o -name "manifest.webmanifest" \) 2>/dev/null); do
-            # 1. normalize double main prefix to the PR subpath prefix
+            # 1. normalize double main prefix
             sed -i 's|/MultiCalc/MultiCalc/|'"$PR_PREFIX"'/|g' "$f" || true
             # 2. normalize erroneous MultiCalc nested under the pr subdir
             sed -i 's|/MultiCalc/pr/[0-9]*/MultiCalc/|'"$PR_PREFIX"'/|g' "$f" || true
-            # 3. rebase any erroneous top-level /MultiCalc/ (not already under /pr/) 
+            # 3. rebase any erroneous top-level /MultiCalc/ (not already under /pr/)
             sed -i 's|/MultiCalc/\(pr/[0-9]*/\)\{0,1\}\([^p]\)|'"$PR_PREFIX"'/\2|g' "$f" || true
-            # 4. prefix any remaining bare absolute paths (/" not /M...) with the PR subpath
+
+            # 4. prefix bare attribute paths (existing)
             sed -i 's|="\(/[^M][^"]*\)"|="'"$PR_PREFIX"'\1"|g' "$f" || true
             sed -i "s|='\(/[^M][^']*\)'|='$PR_PREFIX\1'|g" "$f" || true
+
+            # 5. Broader fixes for Uno WASM dynamic loaders (require.js, uno-bootstrap, package hash, _framework)
+            # Prefix bare asset roots only when they start with "/package_ or "/_ (safe, won't double-prefix already fixed paths)
+            sed -i 's|"/package_\([^"]*\)"|"/'"$PR_PREFIX"'/package_\1"|g' "$f" || true
+            sed -i "s|'/package_\([^']*\)'|'/ $PR_PREFIX /package_\1'|g" "$f" || true
+            sed -i 's|"/_\([^"]*\)"|"/'"$PR_PREFIX"'/_\1"|g' "$f" || true
+            sed -i "s|'/_\([^']*\)'|'/ $PR_PREFIX /_\1'|g" "$f" || true
+            # Also direct (for cases without surrounding quotes in the match)
+            sed -i 's|"/package_|"/'"$PR_PREFIX"'/package_|g' "$f" || true
+            sed -i 's|"/_|"/'"$PR_PREFIX"'/_|g' "$f" || true
+
+            # 6. Strip integrity attributes — post-processing + subpath deploys frequently break SRI hashes
+            # Cover HTML, JS strings, JSON etc.
+            sed -i 's/ integrity="[^"]*"//g' "$f" || true
+            sed -i "s/ integrity='[^']*'//g" "$f" || true
+            sed -i 's/ integrity=[^ >]*//g' "$f" || true
+            sed -i 's/integrity:"[^"]*"//g' "$f" || true
+            sed -i "s/integrity:'[^']*'//g" "$f" || true
+            sed -i 's/"integrity":"[^"]*"//g' "$f" || true
+
+            # 7. Cleanup any malformed prefixes (e.g. //MultiCalc from concat or partial rewrites)
+            sed -i 's|//MultiCalc/pr/|/MultiCalc/pr/|g' "$f" || true
+            sed -i 's|//MultiCalc/|/MultiCalc/|g' "$f" || true
+            sed -i 's|//pr/|pr/|g' "$f" || true
+            sed -i 's|"/MultiCalc/pr/[^"]*/MultiCalc/pr/|"/MultiCalc/pr/|g' "$f" || true
           done || true
+
+          # Extra global pass to ensure integrity is stripped (SRI often survives in HTML/JS for wasm loads)
+          find site/pr/$PR_NUM -type f \( -name "*.html" -o -name "*.js" -o -name "*.json" -o -name "manifest.webmanifest" \) -exec \
+            sed -i 's/ integrity="[^"]*"//gI' {} + || true
+          find site/pr/$PR_NUM -type f \( -name "*.html" -o -name "*.js" -o -name "*.json" -o -name "manifest.webmanifest" \) -exec \
+            sed -i "s/ integrity='[^']*'//gI" {} + || true
+
+          # Force strip on the actual app index.html (the one served for the subpath)
+          if [ -f site/pr/$PR_NUM/index.html ]; then
+            sed -i 's/ integrity="[^"]*"//gI' site/pr/$PR_NUM/index.html || true
+            sed -i "s/ integrity='[^']*'//gI" site/pr/$PR_NUM/index.html || true
+            sed -i 's/ integrity=[^ >]*//gI' site/pr/$PR_NUM/index.html || true
+            # Also remove any integrity in JS style inside the html if inlined
+            sed -i 's/integrity:"[^"]*"//gI' site/pr/$PR_NUM/index.html || true
+          fi
 
       - name: Remove pre-compressed
         run: find site/pr -type f \( -name "*.br" -o -name "*.gz" \) -delete || true
+
+      - name: Final integrity strip on app index.html (guarantee no SRI)
+        run: |
+          PR_NUM="${{ github.event.pull_request.number }}"
+          APP_INDEX="site/pr/$PR_NUM/index.html"
+          if [ -f "$APP_INDEX" ]; then
+            sed -i 's/ *integrity="[^"]*"//gI' "$APP_INDEX" || true
+            sed -i "s/ *integrity='[^']*'//gI" "$APP_INDEX" || true
+            sed -i 's/ *integrity=[^ >]*//gI' "$APP_INDEX" || true
+            echo "Stripped integrity from $APP_INDEX"
+          fi
+          # Clear sha hashes in json under subdir so JS loader skips integrity checks
+          find site/pr/$PR_NUM -type f \( -name "*.json" -o -name "manifest.webmanifest" \) -exec \
+            sed -i 's/"sha256-[^"]*"/""/g' {} + || true
+
+      - name: Ultimate integrity strip using Python (ensures no SRI attributes left)
+        run: |
+          python3 - << 'PYEOF'
+          import os
+          import re
+          import glob
+
+          def strip_file(path):
+              try:
+                  with open(path, 'r', encoding='utf-8', errors='ignore') as f:
+                      content = f.read()
+                  # Remove integrity=... from HTML attributes (case insensitive)
+                  content = re.sub(r'\s+integrity=["\'][^"\']*["\']', '', content, flags=re.IGNORECASE)
+                  # Remove "integrity": "..." or 'integrity': '...' in JSON/JS
+                  content = re.sub(r'"integrity"\s*:\s*"[^"]*"', '"integrity":""', content)
+                  content = re.sub(r"'integrity'\s*:\s*'[^']*'", "'integrity':''", content)
+                  # Remove sha256 hashes in json values
+                  content = re.sub(r'"sha256-[^"]*"', '""', content)
+                  with open(path, 'w', encoding='utf-8') as f:
+                      f.write(content)
+                  print(f"Stripped: {path}")
+              except Exception as e:
+                  print(f"Error stripping {path}: {e}")
+
+          root = "site/pr"
+          for dirpath, _, filenames in os.walk(root):
+              for fn in filenames:
+                  if fn.endswith(('.html', '.js', '.json', '.webmanifest')):
+                      strip_file(os.path.join(dirpath, fn))
+
+          # Explicit on the main index
+          idx = None
+          for p in glob.glob("site/pr/*/index.html"):
+              idx = p
+              break
+          if idx and os.path.exists(idx):
+              strip_file(idx)
+              print(f"Final strip on {idx}")
+          PYEOF
+
+      - name: Debug - list files in PR subdir (to diagnose missing wasm)
+        run: |
+          PR_NUM="${{ github.event.pull_request.number }}"
+          echo "=== Top level under site/pr/$PR_NUM ==="
+          ls -1 site/pr/$PR_NUM/ 2>/dev/null || echo "no pr dir"
+          echo "=== _framework dir exists? ==="
+          ls -ld site/pr/$PR_NUM/_framework 2>/dev/null || echo "MISSING _framework dir"
+          echo "=== Number of files in _framework ==="
+          find site/pr/$PR_NUM/_framework -type f 2>/dev/null | wc -l || echo 0
+          echo "=== Sample .wasm files ==="
+          ls site/pr/$PR_NUM/_framework/*.wasm 2>/dev/null | head -5 || echo "NO .wasm files found"
+          echo "=== Sample package dir ==="
+          ls site/pr/$PR_NUM/package_* 2>/dev/null | head -1 || echo "NO package dir"
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
