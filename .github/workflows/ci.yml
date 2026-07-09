@@ -371,6 +371,12 @@ jobs:
             sed -i 's|"/MultiCalc/pr/[^"]*/MultiCalc/pr/|"/MultiCalc/pr/|g' "$f" || true
           done || true
 
+          # Extra global pass to ensure integrity is stripped (SRI often survives in HTML/JS for wasm loads)
+          find site/pr/$PR_NUM -type f \( -name "*.html" -o -name "*.js" -o -name "*.json" -o -name "manifest.webmanifest" \) -exec \
+            sed -i 's/ integrity="[^"]*"//g' {} + || true
+          find site/pr/$PR_NUM -type f \( -name "*.html" -o -name "*.js" -o -name "*.json" -o -name "manifest.webmanifest" \) -exec \
+            sed -i "s/ integrity='[^']*'//g" {} + || true
+
       - name: Remove pre-compressed
         run: find site/pr -type f \( -name "*.br" -o -name "*.gz" \) -delete || true
 
