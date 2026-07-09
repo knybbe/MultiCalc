@@ -2,7 +2,8 @@
   <PropertyGroup>
     <!-- All requested platforms via Uno:
          net10.0-android;net10.0-ios;net10.0-browserwasm;net10.0-desktop
-         For local dev on this machine without full workloads, temporarily limit the list or use -f net10.0-desktop. -->
+         For local dev without all workloads: use -f net10.0-desktop -p:TargetFrameworks=net10.0-desktop
+         (or temporarily edit this list to the desired TFMs only). -->
     <TargetFrameworks>net10.0-android;net10.0-ios;net10.0-browserwasm;net10.0-desktop</TargetFrameworks>
     <OutputType>Exe</OutputType>
     <UnoSingleProject>true</UnoSingleProject>
@@ -29,7 +30,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Core uses matching TargetFrameworks; reference uses default matching -->
+    <!-- Core declares net10.0 by default (for tests); platform jobs override TargetFrameworks on both to get per-platform Core outputs (e.g. for Android assets/RID). -->
     <ProjectReference Include="..\MultiCalc.Core\MultiCalc.Core.csproj" />
   </ItemGroup>
 

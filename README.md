@@ -26,32 +26,35 @@ A basic multiplatform calculator built with **Uno Platform**.
 
 ```bash
 cd MultiCalc
-dotnet restore
+# Note: plain `dotnet restore` or build will require workloads for *all* declared platforms in the app.
+# Use targeted -p: override (see below) for dev machines with partial workloads.
 ```
 
 ### Run / Build locally
 ```bash
-# Desktop (recommended for quick dev on Mac)
-dotnet build -f net10.0-desktop
-dotnet run -f net10.0-desktop
+# Desktop (recommended for quick dev on Mac, Linux, Windows)
+dotnet build -f net10.0-desktop -p:TargetFrameworks=net10.0-desktop
+dotnet run -f net10.0-desktop -p:TargetFrameworks=net10.0-desktop
 
-# WebAssembly (serves in browser)
-dotnet build -f net10.0-browserwasm
+# WebAssembly (serves in browser; requires `dotnet workload install wasm-tools`)
+dotnet build -f net10.0-browserwasm -p:TargetFrameworks=net10.0-browserwasm
 # Then serve the publish output, e.g.:
-dotnet publish -f net10.0-browserwasm -c Release -o ../artifacts/wasm
+dotnet publish -f net10.0-browserwasm -p:TargetFrameworks=net10.0-browserwasm -c Release -o ../artifacts/wasm
 # cd ../artifacts/wasm && npx http-server -p 8080   (or dotnet serve)
 # Open http://localhost:8080
 ```
 
-On CI or full dev machine use the complete target list in the csproj.
+Core is declared as net10.0 (using Uno.Sdk to support TFM overrides in CI); per-platform builds of Core happen via -p:TargetFrameworks overrides in CI for proper Android etc. assets. For local tests just `dotnet test` (in Tests dir) works with no extra workloads.
 
 ## Tests
+Tests target plain net10.0 and can run anywhere .NET 10 is installed (no mobile workloads needed).
+
 ```bash
-cd ../MultiCalc.Tests   # from solution root or appropriate
+cd MultiCalc.Tests
 dotnet test
 ```
 
-All core arithmetic, edge cases, chaining, error states are covered.
+All core arithmetic, edge cases, chaining, error states are covered. (19 tests)
 
 ## GitHub Actions
 Pushes/PRs trigger:
