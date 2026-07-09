@@ -4,6 +4,8 @@ A basic multiplatform calculator built with **Uno Platform**.
 
 **Platforms**: macOS, Windows, Linux, Android, iOS, WebAssembly (browser).
 
+**🌐 Live Demo (WebAssembly)**: [https://knybbe.github.io/MultiCalc/](https://knybbe.github.io/MultiCalc/)
+
 ## Features (basic operations)
 - Addition, subtraction, multiplication, division
 - Decimal point, percent, sign toggle (+/-)
@@ -16,6 +18,7 @@ A basic multiplatform calculator built with **Uno Platform**.
 - `MultiCalc.Core/` — Pure .NET class library containing `CalculatorEngine` (no UI)
 - `MultiCalc.Tests/` — xUnit tests for the engine (run on any .NET)
 - `.github/workflows/ci.yml` — GitHub Actions for tests + cross-platform builds
+- `.github/workflows/deploy-wasm.yml` — Deploys the WebAssembly build to GitHub Pages on main pushes
 
 ## Getting Started (local)
 
@@ -64,6 +67,8 @@ Pushes/PRs trigger:
 - Windows publish
 - Android publish
 - macOS + iOS publish (macOS runner)
+
+On push to `main`, the WASM build is automatically deployed to GitHub Pages.
 
 Artifacts are uploaded for inspection. For real store releases you will need to add signing secrets (certificates, provisioning profiles) — see notes in workflow.
 
