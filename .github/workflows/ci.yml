@@ -59,8 +59,17 @@ jobs:
       - name: Restore
         run: dotnet restore MultiCalc/MultiCalc.csproj -p:TargetFrameworks=net10.0-browserwasm --no-dependencies
 
+      - name: Set BaseHref for deployment
+        id: basehref
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "value=/MultiCalc/prerelease/${{ github.event.pull_request.number }}/" >> $GITHUB_OUTPUT
+          else
+            echo "value=/MultiCalc/" >> $GITHUB_OUTPUT
+          fi
+
       - name: Publish WASM
-        run: dotnet publish MultiCalc/MultiCalc.csproj -c Release -f net10.0-browserwasm -p:TargetFrameworks=net10.0-browserwasm -p:BaseHref=/MultiCalc/ -o artifacts/wasm --no-restore
+        run: dotnet publish MultiCalc/MultiCalc.csproj -c Release -f net10.0-browserwasm -p:TargetFrameworks=net10.0-browserwasm -p:BaseHref=${{ steps.basehref.outputs.value }} -o artifacts/wasm --no-restore
 
       - name: Upload WASM artifact
         uses: actions/upload-artifact@v4
@@ -214,8 +223,8 @@ jobs:
       group: "pages-${{ github.event_name == 'pull_request' && github.event.pull_request.number || 'main' }}"
       cancel-in-progress: true
     environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      name: ${{ github.event_name == 'pull_request' && 'prerelease' || 'github-pages' }}
+      url: https://knybbe.github.io/MultiCalc/${{ github.event_name == 'pull_request' && format('prerelease/{0}', github.event.pull_request.number) || '' }}
     steps:
       # Download the artifact produced by the needed build-wasm job
       # (the job only runs after successful build-wasm on main or dispatch)
@@ -224,6 +233,16 @@ jobs:
         with:
           name: wasm
           path: site
+
+      - name: Restructure site for PR prerelease subpath
+        if: github.event_name == 'pull_request'
+        run: |
+          PR_NUM="${{ github.event.pull_request.number }}"
+          mkdir -p /tmp/pr_content
+          mv site/* /tmp/pr_content/ 2>/dev/null || true
+          mkdir -p site/prerelease/$PR_NUM
+          mv /tmp/pr_content/* site/prerelease/$PR_NUM/ 2>/dev/null || true
+          echo "Restructured for prerelease/$PR_NUM"
 
       - name: Prepare GitHub Pages site (promote wwwroot + SPA fallback)
         run: |
